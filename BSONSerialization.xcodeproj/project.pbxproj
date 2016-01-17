@@ -10,6 +10,7 @@
 		7BC105811C4C425C004CFB30 /* BSONSerialization.h in Headers */ = {isa = PBXBuildFile; fileRef = 7BC105801C4C425C004CFB30 /* BSONSerialization.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7BC105881C4C425C004CFB30 /* BSONSerialization.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */; };
 		7BC1058D1C4C425C004CFB30 /* BSONSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */; };
+		7BC105981C4C49AB004CFB30 /* BSONSerialization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC105971C4C49AB004CFB30 /* BSONSerialization.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,6 +30,7 @@
 		7BC105871C4C425C004CFB30 /* BSONSerializationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BSONSerializationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BSONSerializationTests.swift; sourceTree = "<group>"; };
 		7BC1058E1C4C425C004CFB30 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7BC105971C4C49AB004CFB30 /* BSONSerialization.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BSONSerialization.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				7BC105801C4C425C004CFB30 /* BSONSerialization.h */,
+				7BC105971C4C49AB004CFB30 /* BSONSerialization.swift */,
 				7BC105821C4C425C004CFB30 /* Info.plist */,
 			);
 			path = BSONSerialization;
@@ -194,6 +197,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7BC105981C4C49AB004CFB30 /* BSONSerialization.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -305,6 +309,7 @@
 		7BC105921C4C425C004CFB30 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
@@ -317,12 +322,14 @@
 				PRODUCT_BUNDLE_IDENTIFIER = me.frizlab.BSONSerialization;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
 		};
 		7BC105931C4C425C004CFB30 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEFINES_MODULE = YES;
 				DYLIB_COMPATIBILITY_VERSION = 1;
