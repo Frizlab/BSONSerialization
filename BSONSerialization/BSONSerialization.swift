@@ -319,7 +319,7 @@ class BSONSerialization {
 	- Returns: The required type.
 	*/
 	private class func readDataInBigEnoughBuffer(dataSize size: Int, bufferHandling: BufferHandling, buffer: UnsafeMutablePointer<UInt8>, inout bufferStartPos: Int, inout bufferValidLength: Int, maxBufferSize: Int, inout totalNReadBytes: Int, stream: NSInputStream) throws -> NSData {
-		assert(maxBufferSize > size)
+		assert(maxBufferSize >= size)
 		
 		let bufferStart = buffer.advancedBy(bufferStartPos)
 		
@@ -367,7 +367,7 @@ class BSONSerialization {
 	*/
 	private class func readDataFromBuffer(dataSize size: Int, alwaysCopyBytes: Bool, buffer: UnsafeMutablePointer<UInt8>, inout bufferStartPos: Int, inout bufferValidLength: Int, maxBufferSize: Int, inout totalNReadBytes: Int, stream: NSInputStream) throws -> NSData {
 		assert(maxBufferSize > 0)
-		assert(bufferStartPos < maxBufferSize)
+		assert(bufferStartPos <= maxBufferSize)
 		assert(bufferValidLength <= maxBufferSize - bufferStartPos)
 		
 		let bufferStart = buffer.advancedBy(bufferStartPos)
@@ -543,12 +543,12 @@ class BSONSerialization {
 	*/
 	private class func readStringFromBuffer(buffer: UnsafeMutablePointer<UInt8>, inout bufferStartPos: Int, inout bufferValidLength: Int, maxBufferSize: Int, inout totalNReadBytes: Int, stream: NSInputStream) throws -> String {
 		let stringSize: Int32 = try readTypeFromBuffer(buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		let data = try readDataFromBuffer(dataSize: Int(stringSize), alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		assert(Int32(data.length) == stringSize)
-		/* TODO: Will the null-byte at the end screw things up? */
+		let data = try readDataFromBuffer(dataSize: Int(stringSize)-1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
+		assert(data.length == Int32(stringSize)-1)
 		guard let str = String(data: data, encoding:NSUTF8StringEncoding) else {
 			throw BSONSerializationError.InvalidUTF8String(data)
 		}
+		let _ = try readDataFromBuffer(dataSize: 1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
 		return str
 	}
 	
