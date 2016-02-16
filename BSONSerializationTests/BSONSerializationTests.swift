@@ -37,7 +37,7 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	func testKeyAbcValDef() {
-		let data = NSData(base64EncodedString: "EgAAAAJhYmMAAwAAAGRlZgAA", options: [])!
+		let data = NSData(base64EncodedString: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
 		do {
 			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
 			let e = ["abc": "def"] as NSDictionary
