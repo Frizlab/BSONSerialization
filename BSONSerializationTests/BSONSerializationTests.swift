@@ -25,9 +25,26 @@ class BSONSerializationTests: XCTestCase {
 		super.tearDown()
 	}
 	
-	func testExample() {
-		/* This is an example of a functional test case.
-		 * Use XCTAssert and related functions to verify your tests produce the correct results. */
+	func testEmptyBSON() {
+		let data = NSData(base64EncodedString: "BQAAAAA=", options: [])!
+		do {
+			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
+			let e = [String: AnyObject]() as NSDictionary
+			XCTAssertEqual(r, e)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testKeyAbcValDef() {
+		let data = NSData(base64EncodedString: "EgAAAAJhYmMAAwAAAGRlZgAA", options: [])!
+		do {
+			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
+			let e = ["abc": "def"] as NSDictionary
+			XCTAssertEqual(r, e)
+		} catch {
+			XCTFail("\(error)")
+		}
 	}
 	
 	func testPerformanceExample() {
