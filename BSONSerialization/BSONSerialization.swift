@@ -6,7 +6,7 @@
  * Copyright © 2016 frizlab. All rights reserved.
  */
 
-import Cocoa
+import Foundation
 
 
 
