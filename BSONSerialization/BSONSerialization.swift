@@ -84,8 +84,8 @@ class BSONSerialization {
 		case Array               = 0x04
 		
 		/**
-      `NSData`.
-      Special internal type used by MongoDB replication and sharding.
+		`NSData`.
+		Special internal type used by MongoDB replication and sharding.
 		First 4 bytes are an increment, second 4 are a timestamp. */
 		case Timestamp           = 0x11
 		/** `NSData`. Raw value is an Int32, followed by a subtype (1 byte) then
