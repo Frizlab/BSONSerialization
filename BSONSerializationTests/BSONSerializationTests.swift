@@ -26,7 +26,7 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	func testEmptyBSON() {
-		let data = NSData(base64EncodedString: "BQAAAAA=", options: [])!
+		let data = Data(base64Encoded: "BQAAAAA=", options: [])!
 		do {
 			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
 			let e = [String: AnyObject]() as NSDictionary
@@ -37,7 +37,7 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	func testKeyAbcValDef() {
-		let data = NSData(base64EncodedString: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
+		let data = Data(base64Encoded: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
 		do {
 			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
 			let e = ["abc": "def"] as NSDictionary
@@ -49,7 +49,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testPerformanceExample() {
 		/* This is an example of a performance test case. */
-		self.measureBlock {
+		self.measure {
 			/* Put the code you want to measure the time of here. */
 		}
 	}
