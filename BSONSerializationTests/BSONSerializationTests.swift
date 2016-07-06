@@ -28,7 +28,7 @@ class BSONSerializationTests: XCTestCase {
 	func testEmptyBSON() {
 		let data = Data(base64Encoded: "BQAAAAA=", options: [])!
 		do {
-			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
+			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = [String: AnyObject]() as NSDictionary
 			XCTAssertEqual(r, e)
 		} catch {
@@ -39,7 +39,7 @@ class BSONSerializationTests: XCTestCase {
 	func testKeyAbcValDef() {
 		let data = Data(base64Encoded: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
 		do {
-			let r = try BSONSerialization.BSONObjectWithData(data, options: []) as NSDictionary
+			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = ["abc": "def"] as NSDictionary
 			XCTAssertEqual(r, e)
 		} catch {
