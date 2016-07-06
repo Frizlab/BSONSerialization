@@ -249,7 +249,7 @@ class BSONSerialization {
 	- Returns: The required type.
 	*/
 	private class func readTypeFromStream<Type>(_ stream: InputStream, buffer: UnsafeMutablePointer<UInt8>, maxBufferSize: Int, totalNReadBytes: inout Int) throws -> Type {
-		let size = sizeof(Type)
+		let size = sizeof(Type.self)
 		if maxBufferSize < size {
 			/* If the given buffer is too small, we create our own buffer. */
 			print("Got too small buffer of size \(maxBufferSize) to read type \(Type.self) of size \(size). Retrying with a bigger buffer.")
@@ -285,8 +285,8 @@ class BSONSerialization {
 	- Returns: The required type.
 	*/
 	private class func readTypeFromBuffer<Type>(_ buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> Type {
-		let data = try readDataFromBuffer(dataSize: sizeof(Type), alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		assert(data.count == sizeof(Type))
+		let data = try readDataFromBuffer(dataSize: sizeof(Type.self), alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
+		assert(data.count == sizeof(Type.self))
 		return unsafeBitCast((data as NSData).bytes, to: UnsafePointer<Type>.self).pointee
 	}
 	
