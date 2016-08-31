@@ -25,7 +25,7 @@ struct BSONWritingOptions : OptionSet {
 class BSONSerialization {
 	
 	/** The BSON Serialization errors enum. */
-	enum BSONSerializationError : ErrorProtocol {
+	enum BSONSerializationError : Error {
 		/** The given data/stream contains too few bytes to be a valid bson doc. */
 		case dataTooSmall
 		/** The given data size is not the one declared by the bson doc. */
@@ -137,7 +137,7 @@ class BSONSerialization {
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> [String: AnyObject] {
+	class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> [String: Any] {
 		guard data.count >= 5 else {
 			throw BSONSerializationError.dataTooSmall
 		}
@@ -175,16 +175,16 @@ class BSONSerialization {
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> [String: AnyObject] {
-		precondition(sizeof(Double.self) == 8, "I currently need Double to be 64 bits")
+	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> [String: Any] {
+		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		var bufferSize = 0
 		var posInBuffer = 0
 		var totalBytesRead = 0
 		let maxBufferSize = 1024*1024 /* 1MB */
-		let buffer = UnsafeMutablePointer<UInt8>(allocatingCapacity: maxBufferSize)
+		let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxBufferSize)
 //		if buffer == nil {throw BSONSerializationError.cannotAllocateMemory(maxBufferSize)}
-		defer {buffer.deallocateCapacity(maxBufferSize)}
+		defer {buffer.deallocate(capacity: maxBufferSize)}
 		
 		/* TODO: Handle endianness! */
 		
@@ -197,7 +197,7 @@ class BSONSerialization {
 		guard bufferSize > 0 else {throw BSONSerializationError.earlyStreamEnding}
 		totalBytesRead += bufferSize
 		
-		var ret = [String: AnyObject]()
+		var ret = [String: Any]()
 		
 		var isAtEnd = false
 		while !isAtEnd {
@@ -223,15 +223,15 @@ class BSONSerialization {
 		return ret
 	}
 	
-	class func data(BSONObject: AnyObject, options opt: BSONWritingOptions) throws -> Data {
+	class func data(BSONObject: Any, options opt: BSONWritingOptions) throws -> Data {
 		return Data()
 	}
 	
-	class func write(BSONObject: AnyObject, toStream stream: NSOutputStream, options opt: BSONWritingOptions, error: NSErrorPointer) -> Int {
+	class func write(BSONObject: Any, toStream stream: OutputStream, options opt: BSONWritingOptions, error: NSErrorPointer) -> Int {
 		return 0
 	}
 	
-	class func isValidBSONObject(_ obj: AnyObject) -> Bool {
+	class func isValidBSONObject(_ obj: Any) -> Bool {
 		return false
 	}
 	
@@ -249,13 +249,13 @@ class BSONSerialization {
 	- Returns: The required type.
 	*/
 	private class func readType<Type>(stream: InputStream, buffer: UnsafeMutablePointer<UInt8>, maxBufferSize: Int, totalNReadBytes: inout Int) throws -> Type {
-		let size = sizeof(Type.self)
+		let size = MemoryLayout<Type>.size
 		if maxBufferSize < size {
 			/* If the given buffer is too small, we create our own buffer. */
 			print("Got too small buffer of size \(maxBufferSize) to read type \(Type.self) of size \(size). Retrying with a bigger buffer.")
-			let buffer = UnsafeMutablePointer<UInt8>(allocatingCapacity: size)
+			let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
 //			if buffer == nil {throw BSONSerializationError.cannotAllocateMemory(size)}
-			defer {buffer.deallocateCapacity(size)}
+			defer {buffer.deallocate(capacity: size)}
 			return try readType(stream: stream, buffer: buffer, maxBufferSize: size, totalNReadBytes: &totalNReadBytes)
 		}
 		
@@ -285,8 +285,8 @@ class BSONSerialization {
 	- Returns: The required type.
 	*/
 	private class func readType<Type>(buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> Type {
-		let data = try readDataFromBuffer(dataSize: sizeof(Type.self), alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		assert(data.count == sizeof(Type.self))
+		let data = try readDataFromBuffer(dataSize: MemoryLayout<Type>.size, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
+		assert(data.count == MemoryLayout<Type>.size)
 		return unsafeBitCast((data as NSData).bytes, to: UnsafePointer<Type>.self).pointee
 	}
 	
@@ -391,7 +391,7 @@ class BSONSerialization {
 			/* The buffer total size is enough to hold the size we want to read.
 			 * However, we must relocate data in the buffer so the buffer start
 			 * position is 0. */
-			buffer.assignFrom(bufferStart, count: bufferValidLength); bufferStartPos = 0
+			buffer.assign(from: bufferStart, count: bufferValidLength); bufferStartPos = 0
 			return try readDataInBigEnoughBuffer(
 				dataSize: size,
 				bufferHandling: (alwaysCopyBytes ? .copyBytes : .useBufferLeaveOwnership),
@@ -412,7 +412,7 @@ class BSONSerialization {
 			let biggerBuffer = unsafeBitCast(m, to: UnsafeMutablePointer<UInt8>.self)
 			
 			/* Copying data in our given buffer to the new buffer. */
-			biggerBuffer.assignFrom(bufferStart, count: bufferValidLength) /* size is greater than maxBufferSize. We know we will never overflow our own buffer using bufferValidLength */
+			biggerBuffer.assign(from: bufferStart, count: bufferValidLength) /* size is greater than maxBufferSize. We know we will never overflow our own buffer using bufferValidLength */
 			var newStartPos = 0, newValidLength = bufferValidLength
 			
 			bufferStartPos = 0; bufferValidLength = 0
@@ -478,7 +478,7 @@ class BSONSerialization {
 				if newBufferStart != newBuffer {
 					/* We can move the data to the beginning of the buffer. */
 					assert(newBufferStartPos > 0)
-					newBuffer.assignFrom(newBufferStart, count: newBufferValidLength)
+					newBuffer.assign(from: newBufferStart, count: newBufferValidLength)
 					newBufferStart = newBuffer; newBufferEnd = newBufferStart.advanced(by: newBufferValidLength); newBufferStartPos = 0
 					if newBuffer == buffer {bufferStartPos = 0}
 				} else {
@@ -492,12 +492,12 @@ class BSONSerialization {
 					let oldBufferSize = newMaxBufferSize
 					
 					newMaxBufferSize += min(newMaxBufferSize, 4*1024 /* 4KB */)
-					newBuffer = UnsafeMutablePointer<UInt8>(allocatingCapacity: newMaxBufferSize)
+					newBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: newMaxBufferSize)
 //					if newBuffer == nil {throw BSONSerializationError.cannotAllocateMemory(newMaxBufferSize)}
-					newBuffer.assignFrom(oldBuffer, count: newBufferValidLength)
+					newBuffer.assign(from: oldBuffer, count: newBufferValidLength)
 					newBufferStart = newBuffer; newBufferEnd = newBufferStart.advanced(by: newBufferValidLength)
 					
-					if oldBuffer != buffer {oldBuffer.deallocateCapacity(oldBufferSize)}
+					if oldBuffer != buffer {oldBuffer.deallocate(capacity: oldBufferSize)}
 				}
 			}
 			
