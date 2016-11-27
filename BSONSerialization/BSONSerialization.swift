@@ -76,7 +76,7 @@ class BSONSerialization {
 		case int64Bits           = 0x12
 		/** `Double`. 8 bytes (64-bit IEEE 754-2008 binary floating point). */
 		case double64Bits        = 0x01
-		/** `Double`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
+		/** `Data`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
 		Currently returned as a Data object containing 16 bytes. */
 		case double128Bits       = 0x13
 		/** `NSDate`. Raw value is the number of milliseconds since the Epoch in
