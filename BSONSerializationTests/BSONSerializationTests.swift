@@ -25,20 +25,30 @@ class BSONSerializationTests: XCTestCase {
 		super.tearDown()
 	}
 	
-	func testEmptyBSON() {
-		let data = Data(base64Encoded: "BQAAAAA=", options: [])!
+	func testDecodeEmptyBSON() {
 		do {
+			let data = Data(base64Encoded: "BQAAAAA=", options: [])!
 			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
-			let e = [String: AnyObject]() as NSDictionary
+			let e = [String: Any]() as NSDictionary
 			XCTAssertEqual(r, e)
 		} catch {
 			XCTFail("\(error)")
 		}
 	}
 	
-	func testKeyAbcValDef() {
-		let data = Data(base64Encoded: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
+	func testEncodeEmptyBSON() {
 		do {
+			let ref = "BQAAAAA="
+			let res = try BSONSerialization.data(BSONObject: [:], options: []).base64EncodedString()
+			XCTAssertEqual(ref, res)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testDecodeKeyAbcValDef() {
+		do {
+			let data = Data(base64Encoded: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
 			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = ["abc": "def"] as NSDictionary
 			XCTAssertEqual(r, e)
@@ -47,10 +57,16 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
-	func testPerformanceExample() {
-		/* This is an example of a performance test case. */
+	func testPerformanceDecode4242EmptyDictionary() {
 		self.measure {
-			/* Put the code you want to measure the time of here. */
+			for _ in 0..<4242 {
+				do {
+					let data = Data(base64Encoded: "BQAAAAA=", options: [])!
+					_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+				} catch {
+					XCTFail("\(error)")
+				}
+			}
 		}
 	}
 	

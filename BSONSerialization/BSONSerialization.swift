@@ -24,6 +24,12 @@ struct BSONWritingOptions : OptionSet {
 
 class BSONSerialization {
 	
+	/* TODO: Study the feasibility of creating a Decimal128 type. */
+//	typealias Decimal128 = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+//	struct Decimal128/* : AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
+//		
+//	}
+	
 	/** The BSON Serialization errors enum. */
 	enum BSONSerializationError : Error {
 		/** The given data/stream contains too few bytes to be a valid bson doc. */
@@ -43,6 +49,10 @@ class BSONSerialization {
 		/** Invalid UTF8 string found. The raw data forming the invalid UTF8
 		string is given in argument to this enum case. */
 		case invalidUTF8String(Data)
+		/** Invalid end of BSON string found. Expected NULL (0), but found the
+		bytes given in argument to this enum case (if nil, no data can be read
+		after the string). */
+		case invalidEndOfString(UInt8?)
 		
 		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
 		case cannotAllocateMemory(Int)
@@ -64,8 +74,11 @@ class BSONSerialization {
 		case int32Bits           = 0x10
 		/** `Int64`. 8 bytes (64-bit signed integer, two’s complement). */
 		case int64Bits           = 0x12
-		/** `Double`. 8 bytes (64-bit IEEE 754-2008 binary floating point)/ */
+		/** `Double`. 8 bytes (64-bit IEEE 754-2008 binary floating point). */
 		case double64Bits        = 0x01
+		/** `Double`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
+		Currently returned as a Data object containing 16 bytes. */
+		case double128Bits       = 0x13
 		/** `NSDate`. Raw value is the number of milliseconds since the Epoch in
 		UTC in an Int64. */
 		case utcDateTime         = 0x09
@@ -214,8 +227,14 @@ class BSONSerialization {
 			case BSONElementType.double64Bits.rawValue:
 				let val: Double = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
 				ret[key] = val
+				
+			case BSONElementType.double128Bits.rawValue:
+				let val = try readDataFromBuffer(dataSize: 16, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = val
+				
 			case BSONElementType.utf8String.rawValue:
 				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				
 			default: throw BSONSerializationError.invalidElementType(currentElementType)
 			}
 		}
@@ -355,7 +374,7 @@ class BSONSerialization {
 	a new buffer big enough is created.
 	
 	- Parameter dataSize: The size of the data to return.
-	- Parameter alwaysCopyBytes: If `true`, the bytes will be copied from the buffer in the NSData object. Else, the returned NSData object might share its bytes with the buffer.
+	- Parameter alwaysCopyBytes: If `true`, the bytes will be copied from the buffer in the Data object. Else, the returned Data object might share its bytes with the buffer.
 	- Parameter buffer: The buffer from which to start reading the bytes.
 	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
 	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
