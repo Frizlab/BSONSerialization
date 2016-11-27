@@ -242,15 +242,26 @@ class BSONSerialization {
 		return ret
 	}
 	
-	class func data(BSONObject: Any, options opt: BSONWritingOptions) throws -> Data {
-		return Data()
+	class func data(BSONObject: [String: Any], options opt: BSONWritingOptions) throws -> Data {
+		guard let stream = CFWriteStreamCreateWithAllocatedBuffers(kCFAllocatorDefault, kCFAllocatorDefault) else {
+			throw BSONSerializationError.internalError
+		}
+		guard CFWriteStreamOpen(stream) else {
+			throw BSONSerializationError.internalError
+		}
+		defer {CFWriteStreamClose(stream)}
+		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt)
+		guard let data = CFWriteStreamCopyProperty(stream, .dataWritten) as AnyObject as? Data else {
+			throw BSONSerializationError.internalError
+		}
+		return data
 	}
 	
-	class func write(BSONObject: Any, toStream stream: OutputStream, options opt: BSONWritingOptions, error: NSErrorPointer) -> Int {
+	class func write(BSONObject: [String: Any], toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
 		return 0
 	}
 	
-	class func isValidBSONObject(_ obj: Any) -> Bool {
+	class func isValidBSONObject(_ obj: [String: Any]) -> Bool {
 		return false
 	}
 	
