@@ -46,6 +46,9 @@ class BSONSerialization {
 		enum case. */
 		case invalidElementType(CUnsignedChar)
 		
+		/** Found an invalid bool value (given in arg). */
+		case invalidBooleanValue(UInt8)
+		
 		/** Invalid UTF8 string found. The raw data forming the invalid UTF8
 		string is given in argument to this enum case. */
 		case invalidUTF8String(Data)
@@ -79,8 +82,8 @@ class BSONSerialization {
 		/** `Data`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
 		Currently returned as a Data object containing 16 bytes. */
 		case double128Bits       = 0x13
-		/** `NSDate`. Raw value is the number of milliseconds since the Epoch in
-		UTC in an Int64. */
+		/** `Date`. Raw value is the number of milliseconds since the Epoch in UTC
+		in an Int64. */
 		case utcDateTime         = 0x09
 		/** `NSRegularExpression`. Raw value is two cstring: Regexp pattern first,
 		then regexp options. */
@@ -97,19 +100,18 @@ class BSONSerialization {
 		case array               = 0x04
 		
 		/**
-		`NSData`.
-		Special internal type used by MongoDB replication and sharding.
+		`Data`. Special internal type used by MongoDB replication and sharding.
 		First 4 bytes are an increment, second 4 are a timestamp. */
 		case timestamp           = 0x11
-		/** `NSData`. Raw value is an Int32, followed by a subtype (1 byte) then
-		the actual bytes. */
+		/** `Data`. Raw value is an Int32, followed by a subtype (1 byte) then the
+		actual bytes. */
 		case binary              = 0x05
-		/** `NSData`. 12 bytes, used by MongoDB. */
+		/** `Data`. 12 bytes, used by MongoDB. */
 		case objectId            = 0x07
 		/** `String`. */
 		case javascript          = 0x0D
 		/**
-		`(String, NSDictionary)`. Raw value is an Int32 representing the length of
+		`(String, Dictionary)`. Raw value is an Int32 representing the length of
 		the whole raw value, then a string, then an embedded BSON doc.
 		
 		The document is a mapping from identifiers to values, representing the
@@ -223,19 +225,81 @@ class BSONSerialization {
 			}
 			
 			let key = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-			switch currentElementType {
-			case BSONElementType.double64Bits.rawValue:
+			switch BSONElementType(rawValue: currentElementType) {
+			case .null?:
+				ret[key] = NSNull()
+				
+			case .boolean?:
+				let valAsInt8 = try readDataFromBuffer(dataSize: 1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream).first!
+				switch valAsInt8 {
+				case 0: ret[key] = false
+				case 1: ret[key] = true
+				default: throw BSONSerializationError.invalidBooleanValue(valAsInt8)
+				}
+				
+			case .int32Bits?:
+				let val: Int32 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = val
+				
+			case .int64Bits?:
+				let val: Int64 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = val
+				
+			case .double64Bits?:
 				let val: Double = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
 				ret[key] = val
 				
-			case BSONElementType.double128Bits.rawValue:
-				let val = try readDataFromBuffer(dataSize: 16, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-				ret[key] = val
+			case .double128Bits?:
+				ret[key] = try readDataFromBuffer(dataSize: 16, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
 				
-			case BSONElementType.utf8String.rawValue:
+			case .utcDateTime?:
+				let timestamp: Int64 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = Date(timeIntervalSince1970: TimeInterval(timestamp))
+				
+			case .regularExpression?:
+				fatalError("Not Implemented")
+				
+			case .utf8String?:
 				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
 				
-			default: throw BSONSerializationError.invalidElementType(currentElementType)
+			case .dictionary?:
+				fatalError("Not Implemented")
+				
+			case .array?:
+				fatalError("Not Implemented")
+				
+			case .timestamp?:
+				ret[key] = try readDataFromBuffer(dataSize: 8, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				
+			case .binary?:
+				fatalError("Not Implemented")
+				
+			case .objectId?:
+				ret[key] = try readDataFromBuffer(dataSize: 12, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				
+			case .javascript?:
+				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				
+			case .javascriptWithScope?:
+				fatalError("Not Implemented")
+				
+			case .minKey?:
+				fatalError("Not Implemented")
+				
+			case .maxKey?:
+				fatalError("Not Implemented")
+				
+			case .undefined?:
+				fatalError("Not Implemented")
+				
+			case .dbPointer?:
+				fatalError("Not Implemented")
+				
+			case .symbol?:
+				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				
+			case nil: throw BSONSerializationError.invalidElementType(currentElementType)
+			case .endOfDocument?: fatalError() /* Guarded before the switch */
 			}
 		}
 		guard totalBytesRead == length else {throw BSONSerializationError.invalidLength}
@@ -584,7 +648,7 @@ class BSONSerialization {
 		
 		/* Reading the last byte and checking it is indeed 0. */
 		let null = try readDataFromBuffer(dataSize: 1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		assert(null.count <= 1)
+		assert(null.count == 1)
 		guard null.first == 0 else {throw BSONSerializationError.invalidEndOfString(null.first)}
 		
 		return str
