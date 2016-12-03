@@ -10,6 +10,8 @@ import Foundation
 
 
 
+typealias BSONDoc = [String: Any?]
+
 struct BSONReadingOptions : OptionSet {
 	let rawValue: Int
 	/* Empty. We just create the enum in case we want to add something to it later. */
@@ -24,11 +26,105 @@ struct BSONWritingOptions : OptionSet {
 
 class BSONSerialization {
 	
-	/* TODO: Study the feasibility of creating a Decimal128 type. */
-//	typealias Decimal128 = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-//	struct Decimal128/* : AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
-//		
-//	}
+	struct Double128/* : AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
+		
+		let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+		
+	}
+	
+	struct MongoTimestamp {
+		
+		let increment: (UInt8, UInt8, UInt8, UInt8)
+		let timestamp: (UInt8, UInt8, UInt8, UInt8)
+		
+		init(incrementData: Data, timestampData: Data) {
+			assert(incrementData.count == 4)
+			assert(timestampData.count == 4)
+			increment = (incrementData[0], incrementData[1], incrementData[2], incrementData[3])
+			timestamp = (timestampData[0], timestampData[1], timestampData[2], timestampData[3])
+		}
+		
+	}
+	
+	struct MongoBinary {
+		
+		enum BinarySubtype : UInt8 {
+			case genericBinary = 0x00
+			case function      = 0x01
+			case uuid          = 0x04
+			case md5           = 0x05
+			
+			/* Start of user-defined subtypes (up to 0xFF). */
+			case userDefined   = 0x80
+			
+			case uuidOld       = 0x03
+			case binaryOld     = 0x02
+		}
+		
+		let binaryTypeAsInt: UInt8
+		let data: Data
+		
+		var binaryType: BinarySubtype? {
+			if let t = BinarySubtype(rawValue: binaryTypeAsInt) {return t}
+			if binaryTypeAsInt >= BinarySubtype.userDefined.rawValue {return BinarySubtype.userDefined}
+			return nil
+		}
+		
+	}
+	
+	struct MongoObjectId {
+		
+		let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+		
+	}
+	
+	struct JavascriptWithScope {
+		
+		let javascript: String
+		let scope: BSONDoc
+		
+	}
+	
+	struct MinKey : Comparable {
+		
+		static func ==(lhs: MinKey, rhs: MinKey) -> Bool {return true}
+		static func ==(lhs: MinKey, rhs: Any?) -> Bool {return false}
+		static func ==(lhs: Any?, rhs: MinKey) -> Bool {return false}
+		
+		static func <(lhs: MinKey, rhs: MinKey) -> Bool {return false}
+		static func <(lhs: MinKey, rhs: Any?) -> Bool {return true}
+		static func <(lhs: Any?, rhs: MinKey) -> Bool {return false}
+		
+	}
+	
+	struct MaxKey : Comparable {
+		
+		static func ==(lhs: MaxKey, rhs: MaxKey) -> Bool {return true}
+		static func ==(lhs: MaxKey, rhs: Any?) -> Bool {return false}
+		static func ==(lhs: Any?, rhs: MaxKey) -> Bool {return false}
+		
+		static func <(lhs: MaxKey, rhs: MaxKey) -> Bool {return false}
+		static func <(lhs: MaxKey, rhs: Any?) -> Bool {return false}
+		static func <(lhs: Any?, rhs: MaxKey) -> Bool {return true}
+		
+	}
+	
+	struct MongoDBPointer {
+		
+		let stringPart: String
+		let bytesPart: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+		
+		init(stringPart str: String, bytesPartData: Data) {
+			assert(bytesPartData.count == 12)
+			stringPart = str
+			bytesPart = (
+				bytesPartData[0],  bytesPartData[1],  bytesPartData[2],  bytesPartData[3],
+				bytesPartData[4],  bytesPartData[5],  bytesPartData[6],  bytesPartData[7],
+				bytesPartData[8],  bytesPartData[9],  bytesPartData[10], bytesPartData[11]
+			)
+		}
+		
+	}
 	
 	/** The BSON Serialization errors enum. */
 	enum BSONSerializationError : Error {
@@ -44,7 +140,7 @@ class BSONSerialization {
 		case invalidLength
 		/** An invalid element was found. The element is given in argument to this
 		enum case. */
-		case invalidElementType(CUnsignedChar)
+		case invalidElementType(UInt8)
 		
 		/** Found an invalid bool value (given in arg). */
 		case invalidBooleanValue(UInt8)
@@ -57,6 +153,13 @@ class BSONSerialization {
 		after the string). */
 		case invalidEndOfString(UInt8?)
 		
+		/** Found an invalid regular expression options value (the complete
+		options and the faulty character are given in arg). */
+		case invalidRegularExpressionOptions(options: String, invalidCharacter: Character)
+		/** Found an invalid regular expression value (the regular expression and
+		the parsing error are given in arg). */
+		case invalidRegularExpression(pattern: String, error: Error)
+		
 		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
 		case cannotAllocateMemory(Int)
 		/** An internal error occurred rendering the serialization impossible. */
@@ -68,7 +171,7 @@ class BSONSerialization {
 		/** The end of the document. Parsing ends when this element is found. */
 		case endOfDocument       = 0x00
 		
-		/** `NSNull()` */
+		/** `nil` */
 		case null                = 0x0A
 		/** `Bool`. Raw value is a single byte, containing `'\0'` (`false`) or
 		`'\1'` (`true`). */
@@ -79,8 +182,8 @@ class BSONSerialization {
 		case int64Bits           = 0x12
 		/** `Double`. 8 bytes (64-bit IEEE 754-2008 binary floating point). */
 		case double64Bits        = 0x01
-		/** `Data`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
-		Currently returned as a Data object containing 16 bytes. */
+		/** `.Double128`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
+		Currently Double128 is a struct containing a Data of length 16 bytes. */
 		case double128Bits       = 0x13
 		/** `Date`. Raw value is the number of milliseconds since the Epoch in UTC
 		in an Int64. */
@@ -93,55 +196,44 @@ class BSONSerialization {
 		+ 1, then the actual bytes of the string, then a single 0 byte. */
 		case utf8String          = 0x02
 		
-		/** `NSDictionary`. Raw value is an embedded BSON document */
+		/** `BSONDoc`. Raw value is an embedded BSON document */
 		case dictionary          = 0x03
-		/** `NSArray`. Raw value is an embedded BSON document; keys are "0", "1",
+		/** `[Any?]`. Raw value is an embedded BSON document; keys are "0", "1",
 		etc. and must be ordered in numerical order. */
 		case array               = 0x04
 		
-		/**
-		`Data`. Special internal type used by MongoDB replication and sharding.
-		First 4 bytes are an increment, second 4 are a timestamp. */
+		/** `.MongoTimestamp`. Special internal type used by MongoDB replication
+		and sharding. First 4 bytes are an increment, second 4 are a timestamp. */
 		case timestamp           = 0x11
-		/** `Data`. Raw value is an Int32, followed by a subtype (1 byte) then the
-		actual bytes. */
+		/** `.MongoBinary`. Raw value is an Int32, followed by a subtype (1 byte)
+		then the actual bytes. */
 		case binary              = 0x05
-		/** `Data`. 12 bytes, used by MongoDB. */
+		/** `.MongoObjectId`. 12 bytes, used by MongoDB. */
 		case objectId            = 0x07
 		/** `String`. */
 		case javascript          = 0x0D
 		/**
-		`(String, Dictionary)`. Raw value is an Int32 representing the length of
+		`.JavascriptWithScope`. Raw value is an Int32 representing the length of
 		the whole raw value, then a string, then an embedded BSON doc.
 		
 		The document is a mapping from identifiers to values, representing the
 		scope in which the string should be evaluated.*/
 		case javascriptWithScope = 0x0F
 		
-		/** Special type which compares lower than all other possible BSON element
-		values. */
+		/** `.MinKey` Special type which compares lower than all other possible
+		BSON element values. */
 		case minKey              = 0xFF
-		/** Special type which compares higher than all other possible BSON
-		element values. */
+		/** `.MaxKey` Special type which compares higher than all other possible
+		BSON element values. */
 		case maxKey              = 0x7F
 		
-		/** Undefined value. Deprecated */
+		/** `nil`. Undefined value. Deprecated. */
 		case undefined           = 0x06
-		/** Deprecated. Raw value is a string followed by 12 bytes. */
+		/** `.MongoDBPointer`. Deprecated. Raw value is a string followed by 12
+		bytes. */
 		case dbPointer           = 0x0C
-		/** Valye is `String`. Deprecated. */
+		/** Value is `String`. Deprecated. */
 		case symbol              = 0x0E
-	}
-	
-	private enum BSONElementBinarySubtype : UInt8 {
-		case genericBinary = 0x00
-		case function      = 0x01
-		case uuid          = 0x04
-		case md5           = 0x05
-		case userDefined   = 0x80
-		
-		case uuidOld       = 0x03
-		case binaryOld     = 0x02
 	}
 	
 	/**
@@ -152,7 +244,7 @@ class BSONSerialization {
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> [String: Any] {
+	class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> BSONDoc {
 		guard data.count >= 5 else {
 			throw BSONSerializationError.dataTooSmall
 		}
@@ -190,7 +282,7 @@ class BSONSerialization {
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> [String: Any] {
+	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		var bufferSize = 0
@@ -227,7 +319,7 @@ class BSONSerialization {
 			let key = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
 			switch BSONElementType(rawValue: currentElementType) {
 			case .null?:
-				ret[key] = NSNull()
+				ret[key] = nil
 				
 			case .boolean?:
 				let valAsInt8 = try readDataFromBuffer(dataSize: 1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream).first!
@@ -250,14 +342,32 @@ class BSONSerialization {
 				ret[key] = val
 				
 			case .double128Bits?:
-				ret[key] = try readDataFromBuffer(dataSize: 16, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				/* Note: We assume Swift will **always** represent tuples the way it
+				 *       it currently does and struct won't have any padding... */
+				let val: Double128 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = val
 				
 			case .utcDateTime?:
 				let timestamp: Int64 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
 				ret[key] = Date(timeIntervalSince1970: TimeInterval(timestamp))
 				
 			case .regularExpression?:
-				fatalError("Not Implemented")
+				let pattern = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let options = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				var foundationOptions: NSRegularExpression.Options = [.anchorsMatchLines]
+				for c in options.characters {
+					switch c {
+					case "i": foundationOptions.insert(.caseInsensitive) /* Case insensitive matching */
+					case "m": foundationOptions.remove(.anchorsMatchLines) /* Multiline matching. Not sure if what we've set corresponds exactly to the MongoDB implementation's... */
+					case "x": (/* Verbose Mode. (Unsupported...) */)
+					case "l": (/* Make \w, \W, etc. locale dependent. (Unsupported, or most likely default unremovable behaviour...) */)
+					case "s": foundationOptions.insert(.dotMatchesLineSeparators) /* Dotall mode ('.' matches everything). Not sure if this option is enough */
+					case "u": foundationOptions.insert(.useUnicodeWordBoundaries) /* Make \w, \W, etc. match unicode */
+					default: throw BSONSerializationError.invalidRegularExpressionOptions(options: options, invalidCharacter: c)
+					}
+				}
+				do    {ret[key] = try NSRegularExpression(pattern: pattern, options: foundationOptions)}
+				catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
 				
 			case .utf8String?:
 				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
@@ -269,13 +379,21 @@ class BSONSerialization {
 				fatalError("Not Implemented")
 				
 			case .timestamp?:
-				ret[key] = try readDataFromBuffer(dataSize: 8, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let increment = try readDataFromBuffer(dataSize: 4, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let timestamp = try readDataFromBuffer(dataSize: 4, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = MongoTimestamp(incrementData: increment, timestampData: timestamp)
 				
 			case .binary?:
-				fatalError("Not Implemented")
+				let size: Int32 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let subtypeInt: UInt8 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let data = try readDataFromBuffer(dataSize: Int(size) /* TODO: May (but won't) int overflow */, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = MongoBinary(binaryTypeAsInt: subtypeInt, data: data)
 				
 			case .objectId?:
-				ret[key] = try readDataFromBuffer(dataSize: 12, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				/* Note: We assume Swift will **always** represent tuples the way it
+				 *       it currently does and struct won't have any padding... */
+				let val: MongoObjectId = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = val
 				
 			case .javascript?:
 				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
@@ -284,16 +402,18 @@ class BSONSerialization {
 				fatalError("Not Implemented")
 				
 			case .minKey?:
-				fatalError("Not Implemented")
+				ret[key] = MinKey()
 				
 			case .maxKey?:
-				fatalError("Not Implemented")
+				ret[key] = MaxKey()
 				
 			case .undefined?:
-				fatalError("Not Implemented")
+				ret[key] = nil
 				
 			case .dbPointer?:
-				fatalError("Not Implemented")
+				let stringPart = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let bytesPartData = try readDataFromBuffer(dataSize: 12, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = MongoDBPointer(stringPart: stringPart, bytesPartData: bytesPartData)
 				
 			case .symbol?:
 				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
@@ -306,7 +426,7 @@ class BSONSerialization {
 		return ret
 	}
 	
-	class func data(BSONObject: [String: Any], options opt: BSONWritingOptions) throws -> Data {
+	class func data(withBSONObject BSONObject: BSONDoc, options opt: BSONWritingOptions) throws -> Data {
 		guard let stream = CFWriteStreamCreateWithAllocatedBuffers(kCFAllocatorDefault, kCFAllocatorDefault) else {
 			throw BSONSerializationError.internalError
 		}
@@ -321,11 +441,11 @@ class BSONSerialization {
 		return data
 	}
 	
-	class func write(BSONObject: [String: Any], toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
+	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
 		return 0
 	}
 	
-	class func isValidBSONObject(_ obj: [String: Any]) -> Bool {
+	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
 		return false
 	}
 	
