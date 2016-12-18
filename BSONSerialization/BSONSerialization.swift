@@ -145,9 +145,10 @@ class BSONSerialization {
 		/** Found an invalid bool value (given in arg). */
 		case invalidBooleanValue(UInt8)
 		
-		/** Invalid UTF8 string found. The raw data forming the invalid UTF8
-		string is given in argument to this enum case. */
-		case invalidUTF8String(Data)
+		/** Asked to read an invalid string for the required encoding. The
+		original data that has been tried to be parsed is given in arg of this
+		error. */
+		case invalidString(Data)
 		/** Invalid end of BSON string found. Expected NULL (0), but found the
 		bytes given in argument to this enum case (if nil, no data can be read
 		after the string). */
@@ -283,46 +284,37 @@ class BSONSerialization {
 	- Returns: The serialized BSON data.
 	*/
 	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
+		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
-		
-		var bufferSize = 0
-		var posInBuffer = 0
-		var totalBytesRead = 0
-		let maxBufferSize = 1024*1024 /* 1MB */
-		let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: maxBufferSize)
-//		if buffer == nil {throw BSONSerializationError.cannotAllocateMemory(maxBufferSize)}
-		defer {buffer.deallocate(capacity: maxBufferSize)}
 		
 		/* TODO: Handle endianness! */
 		
-		let length32: Int32 = try readType(stream: stream, buffer: buffer, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead)
+		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamSizeLimit: nil)
+		let length32: Int32 = try bufferedInputStream.readType()
 		guard length32 >= 5 else {throw BSONSerializationError.dataTooSmall}
 		
 		let length = Int(length32)
-		
-		bufferSize = stream.read(buffer, maxLength: min(length, maxBufferSize))
-		guard bufferSize > 0 else {throw BSONSerializationError.earlyStreamEnding}
-		totalBytesRead += bufferSize
+		bufferedInputStream.streamSizeLimit = length
 		
 		var ret = [String: Any]()
 		
 		var isAtEnd = false
 		while !isAtEnd {
-			guard totalBytesRead <= length else {throw BSONSerializationError.invalidLength}
+			guard bufferedInputStream.totalReadBytesCount <= length else {throw BSONSerializationError.invalidLength}
 			
-			let currentElementType: UInt8 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+			let currentElementType: UInt8 = try bufferedInputStream.readType()
 			guard currentElementType != BSONElementType.endOfDocument.rawValue else {
 				isAtEnd = true
 				break
 			}
 			
-			let key = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+			let key = try bufferedInputStream.readCString(encoding: .utf8)
 			switch BSONElementType(rawValue: currentElementType) {
 			case .null?:
 				ret[key] = nil
 				
 			case .boolean?:
-				let valAsInt8 = try readDataFromBuffer(dataSize: 1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream).first!
+				let valAsInt8 = try bufferedInputStream.readData(size: 1, alwaysCopyBytes: false).first!
 				switch valAsInt8 {
 				case 0: ret[key] = false
 				case 1: ret[key] = true
@@ -330,30 +322,30 @@ class BSONSerialization {
 				}
 				
 			case .int32Bits?:
-				let val: Int32 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let val: Int32 = try bufferedInputStream.readType()
 				ret[key] = val
 				
 			case .int64Bits?:
-				let val: Int64 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let val: Int64 = try bufferedInputStream.readType()
 				ret[key] = val
 				
 			case .double64Bits?:
-				let val: Double = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let val: Double = try bufferedInputStream.readType()
 				ret[key] = val
 				
 			case .double128Bits?:
 				/* Note: We assume Swift will **always** represent tuples the way it
-				 *       it currently does and struct won't have any padding... */
-				let val: Double128 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				 *       currently does and struct won't have any padding... */
+				let val: Double128 = try bufferedInputStream.readType()
 				ret[key] = val
 				
 			case .utcDateTime?:
-				let timestamp: Int64 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let timestamp: Int64 = try bufferedInputStream.readType()
 				ret[key] = Date(timeIntervalSince1970: TimeInterval(timestamp))
 				
 			case .regularExpression?:
-				let pattern = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-				let options = try readCString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let pattern = try bufferedInputStream.readCString(encoding: .utf8)
+				let options = try bufferedInputStream.readCString(encoding: .utf8)
 				var foundationOptions: NSRegularExpression.Options = [.anchorsMatchLines]
 				for c in options.characters {
 					switch c {
@@ -370,7 +362,7 @@ class BSONSerialization {
 				catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
 				
 			case .utf8String?:
-				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = try bufferedInputStream.readBSONString(encoding: .utf8)
 				
 			case .dictionary?:
 				fatalError("Not Implemented")
@@ -379,24 +371,24 @@ class BSONSerialization {
 				fatalError("Not Implemented")
 				
 			case .timestamp?:
-				let increment = try readDataFromBuffer(dataSize: 4, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-				let timestamp = try readDataFromBuffer(dataSize: 4, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let increment = try bufferedInputStream.readData(size: 4, alwaysCopyBytes: true)
+				let timestamp = try bufferedInputStream.readData(size: 4, alwaysCopyBytes: true)
 				ret[key] = MongoTimestamp(incrementData: increment, timestampData: timestamp)
 				
 			case .binary?:
-				let size: Int32 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-				let subtypeInt: UInt8 = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-				let data = try readDataFromBuffer(dataSize: Int(size) /* TODO: May (but won't) int overflow */, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let size: Int32 = try bufferedInputStream.readType()
+				let subtypeInt: UInt8 = try bufferedInputStream.readType()
+				let data = try bufferedInputStream.readData(size: Int(size), alwaysCopyBytes: true)
 				ret[key] = MongoBinary(binaryTypeAsInt: subtypeInt, data: data)
 				
 			case .objectId?:
 				/* Note: We assume Swift will **always** represent tuples the way it
-				 *       it currently does and struct won't have any padding... */
-				let val: MongoObjectId = try readType(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				 *       currently does and struct won't have any padding... */
+				let val: MongoObjectId = try bufferedInputStream.readType()
 				ret[key] = val
 				
 			case .javascript?:
-				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = try bufferedInputStream.readBSONString(encoding: .utf8)
 				
 			case .javascriptWithScope?:
 				fatalError("Not Implemented")
@@ -411,18 +403,18 @@ class BSONSerialization {
 				ret[key] = nil
 				
 			case .dbPointer?:
-				let stringPart = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
-				let bytesPartData = try readDataFromBuffer(dataSize: 12, alwaysCopyBytes: true, buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				let stringPart = try bufferedInputStream.readBSONString(encoding: .utf8)
+				let bytesPartData = try bufferedInputStream.readData(size: 12, alwaysCopyBytes: true)
 				ret[key] = MongoDBPointer(stringPart: stringPart, bytesPartData: bytesPartData)
 				
 			case .symbol?:
-				ret[key] = try readString(buffer: buffer, bufferStartPos: &posInBuffer, bufferValidLength: &bufferSize, maxBufferSize: maxBufferSize, totalNReadBytes: &totalBytesRead, stream: stream)
+				ret[key] = try bufferedInputStream.readBSONString(encoding: .utf8)
 				
 			case nil: throw BSONSerializationError.invalidElementType(currentElementType)
 			case .endOfDocument?: fatalError() /* Guarded before the switch */
 			}
 		}
-		guard totalBytesRead == length else {throw BSONSerializationError.invalidLength}
+		guard bufferedInputStream.totalReadBytesCount == length else {throw BSONSerializationError.invalidLength}
 		return ret
 	}
 	
@@ -449,327 +441,43 @@ class BSONSerialization {
 		return false
 	}
 	
-	/** Reads exactly the size of Type in the stream and puts it at the beginning
-	of the buffer. Returns the read value.
+}
+
+
+
+private extension BufferStream {
 	
-	If maxBufferSize is lower than the size of the read value type, will
-	create it’s own buffer to read the value.
-	
-	- Parameter stream: The stream from which to read the type. Must already be opened and configured.
-	- Parameter buffer: The default buffer to use to store the bytes to read the data from. If too small, another buffer will be created.
-	- Parameter maxBufferSize: The buffer size of the given buffer.
-	- Parameter totalNReadBytes: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Throws: `BSONSerializationError` in case of error.
-	- Returns: The required type.
-	*/
-	private class func readType<Type>(stream: InputStream, buffer: UnsafeMutablePointer<UInt8>, maxBufferSize: Int, totalNReadBytes: inout Int) throws -> Type {
-		let size = MemoryLayout<Type>.size
-		if maxBufferSize < size {
-			/* If the given buffer is too small, we create our own buffer. */
-			print("Got too small buffer of size \(maxBufferSize) to read type \(Type.self) of size \(size). Retrying with a bigger buffer.")
-			let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: size)
-//			if buffer == nil {throw BSONSerializationError.cannotAllocateMemory(size)}
-			defer {buffer.deallocate(capacity: size)}
-			return try readType(stream: stream, buffer: buffer, maxBufferSize: size, totalNReadBytes: &totalNReadBytes)
+	func readCString(encoding: String.Encoding) throws -> String {
+		let data = try readData(upToDelimiters: [Data(bytes: [0])], matchingMode: .anyMatchWins, includeDelimiter: false, alwaysCopyBytes: false)
+		_ = try readData(size: 1, alwaysCopyBytes: false)
+		
+		/* This String init fails if the data is invalid for the given encoding. */
+		guard let str = String(data: data, encoding: encoding) else {
+			/* MUST copy the data as the original bytes are not owned by us. */
+			let dataCopy = Data(bytes: Array(data))
+			throw BSONSerialization.BSONSerializationError.invalidString(dataCopy)
 		}
 		
-		var sRead = 0
-		repeat {
-			assert(sRead < size)
-			let r = stream.read(buffer.advanced(by: sRead), maxLength: size-sRead)
-			guard r > 0 else {throw BSONSerializationError.earlyStreamEnding}
-			sRead += r
-		} while sRead != size
-		totalNReadBytes += sRead
-		return unsafeBitCast(buffer, to: UnsafePointer<Type>.self).pointee
+		return str
 	}
 	
-	/** Reads the given type from the buffer at the given position. If there are
-	not enough bytes in the buffer to read the given type, the function will
-	either move the data in the buffer to have enough free space to read the type
-	from the given buffer, or create a temporary buffer to read the type.
-	
-	- Parameter buffer: The buffer from which to start reading the bytes.
-	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
-	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
-	- Parameter maxBufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
-	- Parameter totalNReadBytes: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Parameter stream: The stream from which to read new bytes if needed.
-	- Throws: `BSONSerializationError` in case of error.
-	- Returns: The required type.
-	*/
-	private class func readType<Type>(buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> Type {
-		let data = try readDataFromBuffer(dataSize: MemoryLayout<Type>.size, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		assert(data.count == MemoryLayout<Type>.size)
-		return unsafeBitCast((data as NSData).bytes, to: UnsafePointer<Type>.self).pointee
-	}
-	
-	private enum BufferHandling {
-		/** Copy the bytes from the buffer to the new NSData object. */
-		case copyBytes
-		/** Create the NSData with bytes from the buffer directly without copying.
-		Buffer ownership stays to the caller, which means the NSData object is
-		invalid as soon as the buffer is released (and modified when the buffer is
-		modified). */
-		case useBufferLeaveOwnership
-		/** Create the NSData with bytes from the buffer directly without copying.
-		Takes buffer ownership, which must have been alloc'd using alloc(). */
-		case useBufferTakeOwnership
-	}
-	/** Reads and return the asked size from the buffer and completes with the
-	stream if needed. Uses the given buffer to read the first bytes and store the
-	bytes read from the stream if applicable. The buffer must be big enough to
-	contain the asked size from `bufferStartPos`.
-	
-	- Parameter dataSize: The size of the data to return.
-	- Parameter bufferHandling: How to handle the buffer for the NSData object creation. See the `BufferHandling` enum.
-	- Parameter buffer: The buffer from which to start reading the bytes.
-	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
-	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
-	- Parameter maxBufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
-	- Parameter totalNReadBytes: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Parameter stream: The stream from which to read new bytes if needed.
-	- Throws: `BSONSerializationError` in case of error.
-	- Returns: The required type.
-	*/
-	private class func readDataInBigEnoughBuffer(dataSize size: Int, bufferHandling: BufferHandling, buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> Data {
-		assert(maxBufferSize >= size)
-		
-		let bufferStart = buffer.advanced(by: bufferStartPos)
-		
-		while bufferValidLength < size {
-			let r = stream.read(bufferStart.advanced(by: bufferValidLength), maxLength: maxBufferSize - (bufferStartPos + bufferValidLength))
-			guard r > 0 else {
-				if bufferHandling == .useBufferTakeOwnership {free(buffer)}
-				throw BSONSerializationError.earlyStreamEnding
-			}
-			bufferValidLength += r
-			totalNReadBytes += r
-		}
-		bufferValidLength -= size
-		bufferStartPos += size
-		
-		let ret: Data
-		switch bufferHandling {
-		case .copyBytes:               ret = Data(bytes: UnsafePointer<UInt8>(bufferStart), count: size)
-		case .useBufferTakeOwnership:  ret = Data(bytesNoCopy: UnsafeMutablePointer<UInt8>(bufferStart), count: size, deallocator: .free)
-		case .useBufferLeaveOwnership: ret = Data(bytesNoCopy: UnsafeMutablePointer<UInt8>(bufferStart), count: size, deallocator: .none)
-		}
-		return ret
-	}
-	
-	/** Reads the dataSize bytes from the buffer at the given position. If there
-	are not enough bytes in the buffer, the function will continue reading from
-	the stream.
-	
-	The data in the buffer might be moved so the number of bytes asked fits in
-	it.
-	
-	If the buffer is too small to contain the number of bytes asked to be read,
-	a new buffer big enough is created.
-	
-	- Parameter dataSize: The size of the data to return.
-	- Parameter alwaysCopyBytes: If `true`, the bytes will be copied from the buffer in the Data object. Else, the returned Data object might share its bytes with the buffer.
-	- Parameter buffer: The buffer from which to start reading the bytes.
-	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
-	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
-	- Parameter maxBufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
-	- Parameter totalNReadBytes: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Parameter stream: The stream from which to read new bytes if needed.
-	- Throws: `BSONSerializationError` in case of error.
-	- Returns: The required type.
-	*/
-	private class func readDataFromBuffer(dataSize size: Int, alwaysCopyBytes: Bool, buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> Data {
-		assert(maxBufferSize > 0)
-		assert(bufferStartPos <= maxBufferSize)
-		assert(bufferValidLength <= maxBufferSize - bufferStartPos)
-		
-		let bufferStart = buffer.advanced(by: bufferStartPos)
-		
-		switch size {
-		case let s where s <= maxBufferSize - bufferStartPos:
-			/* The buffer is big enough to hold the size we want to read, from
-			 * buffer start pos. */
-			return try readDataInBigEnoughBuffer(
-				dataSize: size,
-				bufferHandling: (alwaysCopyBytes ? .copyBytes : .useBufferLeaveOwnership),
-				buffer: buffer,
-				bufferStartPos: &bufferStartPos,
-				bufferValidLength: &bufferValidLength,
-				maxBufferSize: maxBufferSize,
-				totalNReadBytes: &totalNReadBytes,
-				stream: stream
-			)
-			
-		case let s where s <= maxBufferSize:
-			/* The buffer total size is enough to hold the size we want to read.
-			 * However, we must relocate data in the buffer so the buffer start
-			 * position is 0. */
-			buffer.assign(from: bufferStart, count: bufferValidLength); bufferStartPos = 0
-			return try readDataInBigEnoughBuffer(
-				dataSize: size,
-				bufferHandling: (alwaysCopyBytes ? .copyBytes : .useBufferLeaveOwnership),
-				buffer: buffer,
-				bufferStartPos: &bufferStartPos,
-				bufferValidLength: &bufferValidLength,
-				maxBufferSize: maxBufferSize,
-				totalNReadBytes: &totalNReadBytes,
-				stream: stream
-			)
-			
-		default:
-			/* The buffer is not big enough to hold the data we want to read. We
-			 * must create our own buffer. */
-			print("Got too small buffer of size \(maxBufferSize) to read size \(size) from buffer. Retrying with a bigger buffer.")
-			let m = malloc(size) /* NOT free'd here. Free'd later when set in NSData, or by the readDataInBigEnoughBuffer function. */
-			if m == nil {throw BSONSerializationError.cannotAllocateMemory(size)}
-			let biggerBuffer = unsafeBitCast(m, to: UnsafeMutablePointer<UInt8>.self)
-			
-			/* Copying data in our given buffer to the new buffer. */
-			biggerBuffer.assign(from: bufferStart, count: bufferValidLength) /* size is greater than maxBufferSize. We know we will never overflow our own buffer using bufferValidLength */
-			var newStartPos = 0, newValidLength = bufferValidLength
-			
-			bufferStartPos = 0; bufferValidLength = 0
-			
-			return try readDataInBigEnoughBuffer(
-				dataSize: size,
-				bufferHandling: .useBufferTakeOwnership,
-				buffer: buffer,
-				bufferStartPos: &newStartPos,
-				bufferValidLength: &newValidLength,
-				maxBufferSize: size,
-				totalNReadBytes: &totalNReadBytes,
-				stream: stream
-			)
-		}
-	}
-	
-	/** Reads a "cstring" from the buffer, continuing with the stream if the
-	buffer does not have the whole cstring.
-	
-	A "cstring" is a UTF8 encoded null-terminated string. As it is null-
-	terminated, the "cstring" cannot represent all that can be represented in
-	UTF8.
-	
-	- Parameter buffer: The buffer from which to start reading the bytes.
-	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
-	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
-	- Parameter maxBufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
-	- Parameter totalNReadBytes: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Parameter stream: The stream from which to read new bytes if needed.
-	- Throws: `BSONSerializationError` in case of error.
-	- Returns: The required type.
-	*/
-	private class func readCString(buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> String {
-		/* Let's find the end of the string ('\0') */
-		var strBytesLength = 0
-		let bufferStart = buffer.advanced(by: bufferStartPos)
-		let bufferEnd = bufferStart.advanced(by: bufferValidLength)
-		for b in bufferStart..<bufferStart.advanced(by: bufferValidLength) {
-			strBytesLength += 1
-			guard b.pointee != 0 else {
-				bufferStartPos += strBytesLength
-				bufferValidLength -= strBytesLength
-				/* Found the 0 */
-				guard let str = String(validatingUTF8: unsafeBitCast(bufferStart, to: UnsafePointer<CChar>.self)) else {
-					throw BSONSerializationError.invalidUTF8String(Data(bytes: UnsafePointer<UInt8>(bufferStart), count: strBytesLength))
-				}
-				return str
-			}
-		}
-		
-		var newBuffer = buffer
-		var newBufferEnd = bufferEnd
-		var newBufferStart = bufferStart
-		var newMaxBufferSize = maxBufferSize
-		var newBufferStartPos = bufferStartPos
-		var newBufferValidLength = bufferValidLength
-		
-		while true {
-			if newBufferStartPos + newBufferValidLength >= maxBufferSize {
-				/* The buffer is not big enough to hold new data... Let's move the
-				 * data to the beginning of the buffer or create a new buffer. */
-				if newBufferStart != newBuffer {
-					/* We can move the data to the beginning of the buffer. */
-					assert(newBufferStartPos > 0)
-					newBuffer.assign(from: newBufferStart, count: newBufferValidLength)
-					newBufferStart = newBuffer; newBufferEnd = newBufferStart.advanced(by: newBufferValidLength); newBufferStartPos = 0
-					if newBuffer == buffer {bufferStartPos = 0}
-				} else {
-					/* The buffer is not big enough anymore. We need to create a new
-					 * bigger one. */
-					bufferStartPos = 0; bufferValidLength = 0
-					
-					assert(newBufferStartPos == 0)
-					
-					let oldBuffer = newBuffer
-					let oldBufferSize = newMaxBufferSize
-					
-					newMaxBufferSize += min(newMaxBufferSize, 4*1024 /* 4KB */)
-					newBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: newMaxBufferSize)
-//					if newBuffer == nil {throw BSONSerializationError.cannotAllocateMemory(newMaxBufferSize)}
-					newBuffer.assign(from: oldBuffer, count: newBufferValidLength)
-					newBufferStart = newBuffer; newBufferEnd = newBufferStart.advanced(by: newBufferValidLength)
-					
-					if oldBuffer != buffer {oldBuffer.deallocate(capacity: oldBufferSize)}
-				}
-			}
-			
-			/* Let's read from the stream now. */
-			let r = stream.read(newBufferEnd, maxLength: newMaxBufferSize - (newBufferStartPos + newBufferValidLength))
-			guard r > 0 else {throw BSONSerializationError.earlyStreamEnding}
-			newBufferValidLength += r
-			totalNReadBytes += r
-			
-			/* Did we read the end of the string? */
-			for b in bufferEnd..<bufferEnd.advanced(by: r) {
-				strBytesLength += 1
-				guard b.pointee != 0 else {
-					/* Found the 0 */
-					if newBuffer == buffer {
-						bufferStartPos += strBytesLength
-						bufferValidLength = newBufferValidLength - strBytesLength
-					}
-					guard let str = String(validatingUTF8: unsafeBitCast(newBufferStart, to: UnsafePointer<CChar>.self)) else {
-						throw BSONSerializationError.invalidUTF8String(Data(bytes: UnsafePointer<UInt8>(bufferStart), count: strBytesLength))
-					}
-					return str
-				}
-			}
-			newBufferEnd = newBufferStart.advanced(by: newBufferValidLength)
-		}
-	}
-	
-	/** Reads a BSON string from the buffer, continuing with the stream if the
-	buffer does not have the whole string.
-	
-	A BSON string is an UTF8 string. It is represented by its size+1 in an Int32
-	followed by the actual bytes for the string (in UTF8), then a null-byte.
-	
-	- Parameter buffer: The buffer from which to start reading the bytes.
-	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
-	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
-	- Parameter maxBufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
-	- Parameter totalNReadBytes: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Parameter stream: The stream from which to read new bytes if needed.
-	- Throws: `BSONSerializationError` in case of error.
-	- Returns: The required type.
-	*/
-	private class func readString(buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, maxBufferSize: Int, totalNReadBytes: inout Int, stream: InputStream) throws -> String {
+	func readBSONString(encoding: String.Encoding) throws -> String {
 		/* Reading the string size. */
-		let stringSize: Int32 = try readType(buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
+		let stringSize: Int32 = try readType()
 		
 		/* Reading the actual string. */
-		let data = try readDataFromBuffer(dataSize: Int(stringSize)-1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
-		assert(data.count == Int32(stringSize)-1)
-		guard let str = String(data: data, encoding:String.Encoding.utf8) else {
-			throw BSONSerializationError.invalidUTF8String(data)
+		let data = try readData(size: Int(stringSize)-1, alwaysCopyBytes: false)
+		assert(data.count == stringSize-1)
+		guard let str = String(data: data, encoding: encoding) else {
+			/* MUST copy the data as the original bytes are not owned by us. */
+			let dataCopy = Data(bytes: Array(data))
+			throw BSONSerialization.BSONSerializationError.invalidString(dataCopy)
 		}
 		
 		/* Reading the last byte and checking it is indeed 0. */
-		let null = try readDataFromBuffer(dataSize: 1, alwaysCopyBytes: false, buffer: buffer, bufferStartPos: &bufferStartPos, bufferValidLength: &bufferValidLength, maxBufferSize: maxBufferSize, totalNReadBytes: &totalNReadBytes, stream: stream)
+		let null = try readData(size: 1, alwaysCopyBytes: false)
 		assert(null.count == 1)
-		guard null.first == 0 else {throw BSONSerializationError.invalidEndOfString(null.first)}
+		guard null.first == 0 else {throw BSONSerialization.BSONSerializationError.invalidEndOfString(null.first)}
 		
 		return str
 	}

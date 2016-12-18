@@ -39,7 +39,7 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeEmptyBSON() {
 		do {
 			let ref = "BQAAAAA="
-			let res = try BSONSerialization.data(BSONObject: [:], options: []).base64EncodedString()
+			let res = try BSONSerialization.data(withBSONObject: [:], options: []).base64EncodedString()
 			XCTAssertEqual(ref, res)
 		} catch {
 			XCTFail("\(error)")

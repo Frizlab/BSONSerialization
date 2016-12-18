@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7B1120571DF4708B0048AE37 /* BufferStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1120561DF4708B0048AE37 /* BufferStream.swift */; };
 		7BC105811C4C425C004CFB30 /* BSONSerialization.h in Headers */ = {isa = PBXBuildFile; fileRef = 7BC105801C4C425C004CFB30 /* BSONSerialization.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7BC105881C4C425C004CFB30 /* BSONSerialization.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */; };
 		7BC1058D1C4C425C004CFB30 /* BSONSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */; };
@@ -24,6 +25,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		7B1120561DF4708B0048AE37 /* BufferStream.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferStream.swift; sourceTree = "<group>"; };
 		7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BSONSerialization.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BC105801C4C425C004CFB30 /* BSONSerialization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSONSerialization.h; sourceTree = "<group>"; };
 		7BC105821C4C425C004CFB30 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				7BC105801C4C425C004CFB30 /* BSONSerialization.h */,
+				7B1120561DF4708B0048AE37 /* BufferStream.swift */,
 				7BC105971C4C49AB004CFB30 /* BSONSerialization.swift */,
 				7BC105821C4C425C004CFB30 /* Info.plist */,
 			);
@@ -200,6 +203,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7BC105981C4C49AB004CFB30 /* BSONSerialization.swift in Sources */,
+				7B1120571DF4708B0048AE37 /* BufferStream.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
