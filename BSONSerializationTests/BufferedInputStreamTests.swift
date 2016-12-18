@@ -45,6 +45,10 @@ class BufferStreamTests: XCTestCase {
 		XCTAssert(d == Data(hexEncoded: "01234567")!)
 	}
 	
+	/* ***************
+	   MARK: - Helpers
+	   *************** */
+	
 	private func stream(fromData data: Data) -> CFReadStream? {
 		let dataBytes = (data as NSData).bytes
 		

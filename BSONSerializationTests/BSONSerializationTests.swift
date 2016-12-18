@@ -27,7 +27,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testDecodeEmptyBSON() {
 		do {
-			let data = Data(base64Encoded: "BQAAAAA=", options: [])!
+			let data = Data(hexEncoded: "0500000000")!
 			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = [String: Any]() as NSDictionary
 			XCTAssertEqual(r, e)
@@ -38,8 +38,8 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testEncodeEmptyBSON() {
 		do {
-			let ref = "BQAAAAA="
-			let res = try BSONSerialization.data(withBSONObject: [:], options: []).base64EncodedString()
+			let ref = "0500000000"
+			let res = try BSONSerialization.data(withBSONObject: [:], options: []).hexEncodedString()
 			XCTAssertEqual(ref, res)
 		} catch {
 			XCTFail("\(error)")
@@ -48,7 +48,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testDecodeKeyAbcValDef() {
 		do {
-			let data = Data(base64Encoded: "EgAAAAJhYmMABAAAAGRlZgAA", options: [])!
+			let data = Data(hexEncoded: "120000000261626300040000006465660000")!
 			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = ["abc": "def"] as NSDictionary
 			XCTAssertEqual(r, e)
@@ -58,10 +58,10 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	func testPerformanceDecode4242EmptyDictionary() {
+		let data = Data(hexEncoded: "0500000000")!
 		self.measure {
 			for _ in 0..<4242 {
 				do {
-					let data = Data(base64Encoded: "BQAAAAA=", options: [])!
 					_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 				} catch {
 					XCTFail("\(error)")

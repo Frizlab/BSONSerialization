@@ -1,5 +1,5 @@
 /*
- * Data+FromHex.swift
+ * Data+HexEncoding.swift
  * BSONSerialization
  *
  * Created by François Lamboley on 18/12/2016.
@@ -46,6 +46,14 @@ extension Data {
 			}
 		}
 		self.init(bytes: bytes)
+	}
+	
+	func hexEncodedString() -> String {
+		var res = ""
+		for b in self {
+			res += String(format: "%02x", b)
+		}
+		return res
 	}
 	
 }
