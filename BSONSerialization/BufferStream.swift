@@ -182,7 +182,7 @@ internal class BufferedInputStream : BufferStream {
 	var bufferStartPos: Int
 	var bufferValidLength: Int
 	
-	var totalReadBytesCount: Int = 0
+	var totalReadBytesCount = 0
 	
 	/** The maximum total number of bytes to read from the stream. Can be changed
 	after some bytes have been read.
@@ -382,152 +382,16 @@ internal class BufferedInputStream : BufferStream {
 			return (alwaysCopyBytes ? Data(bytes: buffer.advanced(by: bufferStartPos), count: returnedLength) : Data(bytesNoCopy: buffer.advanced(by: bufferStartPos), count: returnedLength, deallocator: .none))
 		}
 		
-		if delimiters.count == 0 {return (alwaysCopyBytes ? Data(bytes: buffer.advanced(by: bufferStartPos), count: bufferValidLength) : Data(bytesNoCopy: buffer.advanced(by: bufferStartPos), count: bufferValidLength, deallocator: .none))}
-		else                     {throw BufferStreamError.delimitersNotFound}
-	}
-	
-	/* ***************
-	   MARK: - Private
-	   *************** */
-	
-	/* *****************************
-	   MARK: → For read data of size
-	   ***************************** */
-	
-	private enum BufferHandling {
-		/** Copy the bytes from the buffer to the new Data object. */
-		case copyBytes
-		/** Create the Data with bytes from the buffer directly without copying.
-		Buffer ownership stays to the caller, which means the Data object is
-		invalid as soon as the buffer is released (and modified when the buffer is
-		modified). */
-		case useBufferLeaveOwnership
-		/** Create the Data with bytes from the buffer directly without copying.
-		Takes buffer ownership, which must have been alloc'd using alloc(). */
-		case useBufferTakeOwnership
-	}
-	
-	/** Reads and return the asked size from the buffer and completes with the
-	stream if needed. Uses the given buffer to read the first bytes and store the
-	bytes read from the stream if applicable. The buffer must be big enough to
-	contain the asked size from `bufferStartPos`.
-	
-	- Parameter dataSize: The size of the data to return.
-	- Parameter allowReadingMore: If `true`, this method may read more data than what is actually needed from the stream.
-	- Parameter bufferHandling: How to handle the buffer for the Data object creation. See the `BufferHandling` enum.
-	- Parameter buffer: The buffer from which to start reading the bytes.
-	- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
-	- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
-	- Parameter bufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
-	- Parameter totalReadBytesCount: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
-	- Parameter maxTotalReadBytesCount: The maximum number of total bytes allowed to be read from the stream.
-	- Parameter stream: The stream from which to read new bytes if needed.
-	- Throws: `BufferStreamError` in case of error.
-	- Returns: The read data from the buffer or the stream if necessary.
-	*/
-	private func readDataInBigEnoughBuffer(dataSize size: Int, allowReadingMore: Bool, bufferHandling: BufferHandling, buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, bufferSize: Int, totalReadBytesCount: inout Int, maxTotalReadBytesCount: Int?, stream: InputStream) throws -> Data {
-		assert(bufferSize >= size)
-		
-		let bufferStart = buffer.advanced(by: bufferStartPos)
-		
-		if bufferValidLength < size {
-			/* We must read from the stream. */
-			if let maxTotalReadBytesCount = maxTotalReadBytesCount, maxTotalReadBytesCount < totalReadBytesCount || size - bufferValidLength /* To read from stream */ > maxTotalReadBytesCount - totalReadBytesCount /* Remaining allowed bytes to be read */ {
-				/* We have to read more bytes from the stream than allowed. We bail. */
-				throw BufferStreamError.streamSizeLimitReached
-			}
+		if delimiters.count > 0 {throw BufferStreamError.delimitersNotFound}
+		else {
+			/* We return the whole data. */
+			let returnedLength = bufferValidLength
+			let bufferStart = buffer.advanced(by: bufferStartPos)
 			
-			repeat {
-				let sizeToRead: Int
-				if !allowReadingMore {sizeToRead = size - bufferValidLength /* Checked to fit in the remaining bytes allowed to be read in "if" before this loop */}
-				else {
-					let unmaxedSizeToRead = bufferSize - (bufferStartPos + bufferValidLength) /* The remaining space in the buffer */
-					if let maxTotalReadBytesCount = maxTotalReadBytesCount {sizeToRead = min(unmaxedSizeToRead, maxTotalReadBytesCount - totalReadBytesCount /* Number of bytes remaining allowed to be read */)}
-					else                                                   {sizeToRead =     unmaxedSizeToRead}
-				}
-				assert(sizeToRead > 0)
-				let sizeRead = stream.read(bufferStart.advanced(by: bufferValidLength), maxLength: sizeToRead)
-				guard sizeRead > 0 else {
-					if bufferHandling == .useBufferTakeOwnership {free(buffer)}
-					throw (sizeRead == 0 ? BufferStreamError.noMoreData : BufferStreamError.streamReadError(streamError: stream.streamError))
-				}
-				bufferValidLength += sizeRead
-				totalReadBytesCount += sizeRead
-			} while bufferValidLength < size /* Reading until we have enough data in the buffer. */
-		}
-		
-		assert(maxTotalReadBytesCount == nil || totalReadBytesCount <= maxTotalReadBytesCount!)
-		
-		bufferValidLength -= size
-		bufferStartPos += size
-		
-		let ret: Data
-		switch bufferHandling {
-		case .copyBytes:               ret = Data(bytes: bufferStart, count: size)
-		case .useBufferTakeOwnership:  ret = Data(bytesNoCopy: bufferStart, count: size, deallocator: .free)
-		case .useBufferLeaveOwnership: ret = Data(bytesNoCopy: bufferStart, count: size, deallocator: .none)
-		}
-		return ret
-	}
-	
-	/* ***********************************
-	   MARK: → For read data to delimiters
-	   *********************************** */
-	
-	/* Returns nil if no confirmed matches were found, the length of the matched
-	 * data otherwise. */
-	private func matchDelimiters(inData data: Data, usingMatchingMode matchingMode: BufferStreamDelimiterMatchingMode, includeDelimiter: Bool, minDelimiterLength: Int, withUnmatchedDelimiters unmatchedDelimiters: inout [(offset: Int, element: Data)], matchedDatas: inout [(delimiterIdx: Int, dataLength: Int)]) -> Int? {
-		for delimiter in unmatchedDelimiters.reversed().enumerated() {
-			if let range = data.range(of: delimiter.element.element) {
-				/* Found one of the delimiter. Let's see what we do with it... */
-				let matchedLength = range.lowerBound + (includeDelimiter ? delimiter.element.element.count : 0)
-				switch matchingMode {
-				case .anyMatchWins:
-					/* We found a match. With this matching mode, this is enough!
-					 * We simply return here the data we found, no questions asked. */
-					return matchedLength
-					
-				case .shortestDataWins:
-					/* We're searching for the shortest match. A match of 0 is
-					 * necessarily the shortest! So we can return straight away when
-					 * we find a 0-length match. */
-					guard matchedLength > (includeDelimiter ? minDelimiterLength : 0) else {return matchedLength}
-					unmatchedDelimiters.remove(at: delimiter.offset)
-					matchedDatas.append((delimiterIdx: delimiter.element.offset, dataLength: matchedLength))
-					
-				case .longestDataWins:
-					unmatchedDelimiters.remove(at: delimiter.offset)
-					matchedDatas.append((delimiterIdx: delimiter.element.offset, dataLength: matchedLength))
-					
-				case .firstMatchingDelimiterWins:
-					guard delimiter.offset > 0 else {
-						/* We're searching for the first matching delimiter. If the
-						 * first delimiter matches, we can return the matched data
-						 * straight away! */
-						return matchedLength
-					}
-					unmatchedDelimiters.remove(at: delimiter.offset)
-					matchedDatas.append((delimiterIdx: delimiter.element.offset, dataLength: matchedLength))
-				}
-			}
-		}
-		
-		/* Let's search for a confirmed match. We can only do that if all the
-		 * delimiters have been matched. All other obvious cases have been taken
-		 * care of above. */
-		guard unmatchedDelimiters.count == 0 else {return nil}
-		return findBestMatch(fromMatchedDatas: matchedDatas, usingMatchingMode: matchingMode)
-	}
-	
-	private func findBestMatch(fromMatchedDatas matchedDatas: [(delimiterIdx: Int, dataLength: Int)], usingMatchingMode matchingMode: BufferStreamDelimiterMatchingMode) -> Int? {
-		/* We need to have at least one match in order to be able to return smthg. */
-		guard let firstMatchedData = matchedDatas.first else {return nil}
-		
-		switch matchingMode {
-		case .anyMatchWins: fatalError("INTERNAL LOGIC FAIL!") /* Any match is a trivial case and should have been filtered prior calling this method... */
-		case .shortestDataWins: return matchedDatas.reduce(firstMatchedData, { $0.dataLength < $1.dataLength ? $0 : $1 }).dataLength
-		case .longestDataWins:  return matchedDatas.reduce(firstMatchedData, { $0.dataLength > $1.dataLength ? $0 : $1 }).dataLength
-		case .firstMatchingDelimiterWins: return matchedDatas.reduce(firstMatchedData, { $0.delimiterIdx < $1.delimiterIdx ? $0 : $1 }).dataLength
+			bufferStartPos += bufferValidLength
+			bufferValidLength = 0
+			
+			return (alwaysCopyBytes ? Data(bytes: bufferStart, count: returnedLength) : Data(bytesNoCopy: bufferStart, count: returnedLength, deallocator: .none))
 		}
 	}
 	
@@ -535,13 +399,203 @@ internal class BufferedInputStream : BufferStream {
 
 
 
-//internal class BufferedData : BufferStream {
-//	
-//	let sourceData: Data
-//	
-//	var totalReadBytesCount: Int = 0
-//	
-//	init(stream: InputStream, bufferSize: Int) {
-//	}
-//	
-//}
+internal class BufferedData : BufferStream {
+	
+	let sourceData: Data
+	let sourceDataSize: Int
+	var currentPosition = 0
+	
+	/** Always 0. We do not read anything as our source is already in memory! */
+	let totalReadBytesCount = 0
+	
+	init(data: Data) {
+		sourceData = data
+		sourceDataSize = sourceData.count
+	}
+	
+	func readData(size: Int, alwaysCopyBytes: Bool) throws -> Data {
+		guard (sourceDataSize - currentPosition) >= size else {throw BufferStreamError.noMoreData}
+		
+		return getNextSubData(size: size, alwaysCopyBytes: alwaysCopyBytes)
+	}
+	
+	func readData(upToDelimiters delimiters: [Data], matchingMode: BufferStreamDelimiterMatchingMode, includeDelimiter: Bool, alwaysCopyBytes: Bool) throws -> Data {
+		let minDelimiterLength = delimiters.reduce(delimiters.first?.count ?? 0) { min($0, $1.count) }
+		
+		var unmatchedDelimiters = Array(delimiters.enumerated())
+		var matchedDatas = [(delimiterIdx: Int, dataLength: Int)]()
+		
+		return try sourceData.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Data in
+			let searchedData = Data(bytesNoCopy: unsafeBitCast(bytes, to: UnsafeMutablePointer<UInt8>.self).advanced(by: currentPosition), count: sourceDataSize-currentPosition, deallocator: .none)
+			if let returnedLength = matchDelimiters(inData: searchedData, usingMatchingMode: matchingMode, includeDelimiter: includeDelimiter, minDelimiterLength: minDelimiterLength, withUnmatchedDelimiters: &unmatchedDelimiters, matchedDatas: &matchedDatas) {
+				return getNextSubData(size: returnedLength, alwaysCopyBytes: alwaysCopyBytes)
+			}
+			if let returnedLength = findBestMatch(fromMatchedDatas: matchedDatas, usingMatchingMode: matchingMode) {
+				return getNextSubData(size: returnedLength, alwaysCopyBytes: alwaysCopyBytes)
+			}
+			if delimiters.count == 0 {return getNextSubData(size: sourceDataSize - currentPosition, alwaysCopyBytes: alwaysCopyBytes)}
+			else                     {throw BufferStreamError.delimitersNotFound}
+		}
+	}
+	
+	private func getNextSubData(size: Int, alwaysCopyBytes: Bool) -> Data {
+		let nextPosition = currentPosition + size
+		let range = Range<Int>(currentPosition..<nextPosition)
+		currentPosition = nextPosition
+		
+		if alwaysCopyBytes {return sourceData.subdata(in: range)}
+		else               {return sourceData.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Data in
+			/* Not sure if the unsafeBitCast below is so safe... It should be
+			 * because we'll never modify the data object. */
+			return Data(bytesNoCopy: unsafeBitCast(bytes, to: UnsafeMutablePointer<UInt8>.self).advanced(by: range.lowerBound), count: size, deallocator: .none)
+		}}
+	}
+	
+}
+
+
+
+/* ***************
+   MARK: - Private
+   *************** */
+
+/* *****************************
+   MARK: → For read data of size
+   ***************************** */
+
+private enum BufferHandling {
+	/** Copy the bytes from the buffer to the new Data object. */
+	case copyBytes
+	/** Create the Data with bytes from the buffer directly without copying.
+	Buffer ownership stays to the caller, which means the Data object is
+	invalid as soon as the buffer is released (and modified when the buffer is
+	modified). */
+	case useBufferLeaveOwnership
+	/** Create the Data with bytes from the buffer directly without copying.
+	Takes buffer ownership, which must have been alloc'd using alloc(). */
+	case useBufferTakeOwnership
+}
+
+/** Reads and return the asked size from the buffer and completes with the
+stream if needed. Uses the given buffer to read the first bytes and store the
+bytes read from the stream if applicable. The buffer must be big enough to
+contain the asked size from `bufferStartPos`.
+
+- Parameter dataSize: The size of the data to return.
+- Parameter allowReadingMore: If `true`, this method may read more data than what is actually needed from the stream.
+- Parameter bufferHandling: How to handle the buffer for the Data object creation. See the `BufferHandling` enum.
+- Parameter buffer: The buffer from which to start reading the bytes.
+- Parameter bufferStartPos: Where to start reading the data from in the given buffer.
+- Parameter bufferValidLength: The valid number of bytes from `bufferStartPos` in the buffer.
+- Parameter bufferSize: The maximum number of bytes the buffer can hold (from the start of the buffer).
+- Parameter totalReadBytesCount: The total number of bytes read from the stream so far. Incremented by the number of bytes read in the function on output.
+- Parameter maxTotalReadBytesCount: The maximum number of total bytes allowed to be read from the stream.
+- Parameter stream: The stream from which to read new bytes if needed.
+- Throws: `BufferStreamError` in case of error.
+- Returns: The read data from the buffer or the stream if necessary.
+*/
+private func readDataInBigEnoughBuffer(dataSize size: Int, allowReadingMore: Bool, bufferHandling: BufferHandling, buffer: UnsafeMutablePointer<UInt8>, bufferStartPos: inout Int, bufferValidLength: inout Int, bufferSize: Int, totalReadBytesCount: inout Int, maxTotalReadBytesCount: Int?, stream: InputStream) throws -> Data {
+	assert(bufferSize >= size)
+	
+	let bufferStart = buffer.advanced(by: bufferStartPos)
+	
+	if bufferValidLength < size {
+		/* We must read from the stream. */
+		if let maxTotalReadBytesCount = maxTotalReadBytesCount, maxTotalReadBytesCount < totalReadBytesCount || size - bufferValidLength /* To read from stream */ > maxTotalReadBytesCount - totalReadBytesCount /* Remaining allowed bytes to be read */ {
+			/* We have to read more bytes from the stream than allowed. We bail. */
+			throw BufferStreamError.streamSizeLimitReached
+		}
+		
+		repeat {
+			let sizeToRead: Int
+			if !allowReadingMore {sizeToRead = size - bufferValidLength /* Checked to fit in the remaining bytes allowed to be read in "if" before this loop */}
+			else {
+				let unmaxedSizeToRead = bufferSize - (bufferStartPos + bufferValidLength) /* The remaining space in the buffer */
+				if let maxTotalReadBytesCount = maxTotalReadBytesCount {sizeToRead = min(unmaxedSizeToRead, maxTotalReadBytesCount - totalReadBytesCount /* Number of bytes remaining allowed to be read */)}
+				else                                                   {sizeToRead =     unmaxedSizeToRead}
+			}
+			assert(sizeToRead > 0)
+			let sizeRead = stream.read(bufferStart.advanced(by: bufferValidLength), maxLength: sizeToRead)
+			guard sizeRead > 0 else {
+				if bufferHandling == .useBufferTakeOwnership {free(buffer)}
+				throw (sizeRead == 0 ? BufferStreamError.noMoreData : BufferStreamError.streamReadError(streamError: stream.streamError))
+			}
+			bufferValidLength += sizeRead
+			totalReadBytesCount += sizeRead
+		} while bufferValidLength < size /* Reading until we have enough data in the buffer. */
+	}
+	
+	assert(maxTotalReadBytesCount == nil || totalReadBytesCount <= maxTotalReadBytesCount!)
+	
+	bufferValidLength -= size
+	bufferStartPos += size
+	
+	let ret: Data
+	switch bufferHandling {
+	case .copyBytes:               ret = Data(bytes: bufferStart, count: size)
+	case .useBufferTakeOwnership:  ret = Data(bytesNoCopy: bufferStart, count: size, deallocator: .free)
+	case .useBufferLeaveOwnership: ret = Data(bytesNoCopy: bufferStart, count: size, deallocator: .none)
+	}
+	return ret
+}
+
+/* ***********************************
+   MARK: → For read data to delimiters
+   *********************************** */
+
+/* Returns nil if no confirmed matches were found, the length of the matched
+ * data otherwise. */
+private func matchDelimiters(inData data: Data, usingMatchingMode matchingMode: BufferStreamDelimiterMatchingMode, includeDelimiter: Bool, minDelimiterLength: Int, withUnmatchedDelimiters unmatchedDelimiters: inout [(offset: Int, element: Data)], matchedDatas: inout [(delimiterIdx: Int, dataLength: Int)]) -> Int? {
+	for delimiter in unmatchedDelimiters.reversed().enumerated() {
+		if let range = data.range(of: delimiter.element.element) {
+			/* Found one of the delimiter. Let's see what we do with it... */
+			let matchedLength = range.lowerBound + (includeDelimiter ? delimiter.element.element.count : 0)
+			switch matchingMode {
+			case .anyMatchWins:
+				/* We found a match. With this matching mode, this is enough!
+				 * We simply return here the data we found, no questions asked. */
+				return matchedLength
+				
+			case .shortestDataWins:
+				/* We're searching for the shortest match. A match of 0 is
+				 * necessarily the shortest! So we can return straight away when
+				 * we find a 0-length match. */
+				guard matchedLength > (includeDelimiter ? minDelimiterLength : 0) else {return matchedLength}
+				unmatchedDelimiters.remove(at: delimiter.offset)
+				matchedDatas.append((delimiterIdx: delimiter.element.offset, dataLength: matchedLength))
+				
+			case .longestDataWins:
+				unmatchedDelimiters.remove(at: delimiter.offset)
+				matchedDatas.append((delimiterIdx: delimiter.element.offset, dataLength: matchedLength))
+				
+			case .firstMatchingDelimiterWins:
+				guard delimiter.offset > 0 else {
+					/* We're searching for the first matching delimiter. If the
+					 * first delimiter matches, we can return the matched data
+					 * straight away! */
+					return matchedLength
+				}
+				unmatchedDelimiters.remove(at: delimiter.offset)
+				matchedDatas.append((delimiterIdx: delimiter.element.offset, dataLength: matchedLength))
+			}
+		}
+	}
+	
+	/* Let's search for a confirmed match. We can only do that if all the
+	 * delimiters have been matched. All other obvious cases have been taken
+	 * care of above. */
+	guard unmatchedDelimiters.count == 0 else {return nil}
+	return findBestMatch(fromMatchedDatas: matchedDatas, usingMatchingMode: matchingMode)
+}
+
+private func findBestMatch(fromMatchedDatas matchedDatas: [(delimiterIdx: Int, dataLength: Int)], usingMatchingMode matchingMode: BufferStreamDelimiterMatchingMode) -> Int? {
+	/* We need to have at least one match in order to be able to return smthg. */
+	guard let firstMatchedData = matchedDatas.first else {return nil}
+	
+	switch matchingMode {
+	case .anyMatchWins: fatalError("INTERNAL LOGIC FAIL!") /* Any match is a trivial case and should have been filtered prior calling this method... */
+	case .shortestDataWins: return matchedDatas.reduce(firstMatchedData, { $0.dataLength < $1.dataLength ? $0 : $1 }).dataLength
+	case .longestDataWins:  return matchedDatas.reduce(firstMatchedData, { $0.dataLength > $1.dataLength ? $0 : $1 }).dataLength
+	case .firstMatchingDelimiterWins: return matchedDatas.reduce(firstMatchedData, { $0.delimiterIdx < $1.delimiterIdx ? $0 : $1 }).dataLength
+	}
+}
