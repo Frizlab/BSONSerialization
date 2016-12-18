@@ -405,8 +405,9 @@ internal class BufferedData : BufferStream {
 	let sourceDataSize: Int
 	var currentPosition = 0
 	
-	/** Always 0. We do not read anything as our source is already in memory! */
-	let totalReadBytesCount = 0
+	var totalReadBytesCount: Int {
+		return currentPosition
+	}
 	
 	init(data: Data) {
 		sourceData = data

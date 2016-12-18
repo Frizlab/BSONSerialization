@@ -246,28 +246,8 @@ class BSONSerialization {
 	- Returns: The serialized BSON data.
 	*/
 	class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> BSONDoc {
-		guard data.count >= 5 else {
-			throw BSONSerializationError.dataTooSmall
-		}
-		
-		let dataBytes = (data as NSData).bytes
-		let length = unsafeBitCast(dataBytes, to: UnsafePointer<Int32>.self).pointee
-		
-		guard Int32(data.count) == length else {
-			throw BSONSerializationError.dataLengthDoNotMatch
-		}
-		
-		/* We must not release the bytes memory (which explains the latest
-		 * argument to the stream creation function): the data object will do it
-		 * when released (after the stream has finished being used). */
-		guard let stream = CFReadStreamCreateWithBytesNoCopy(kCFAllocatorDefault, unsafeBitCast(dataBytes, to: UnsafePointer<UInt8>.self), data.count, kCFAllocatorNull) else {
-			throw BSONSerializationError.internalError
-		}
-		guard CFReadStreamOpen(stream) else {
-			throw BSONSerializationError.internalError
-		}
-		defer {CFReadStreamClose(stream)}
-		return try BSONObject(stream: stream, options: opt)
+		let bufferedData = BufferedData(data: data)
+		return try BSONObject(bufferStream: bufferedData, options: opt)
 	}
 	
 	/**
@@ -284,37 +264,44 @@ class BSONSerialization {
 	- Returns: The serialized BSON data.
 	*/
 	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
+		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamSizeLimit: nil)
+		return try BSONObject(bufferStream: bufferedInputStream, options: opt)
+	}
+	
+	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		/* TODO: Handle endianness! */
 		
-		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamSizeLimit: nil)
-		let length32: Int32 = try bufferedInputStream.readType()
+		let length32: Int32 = try bufferStream.readType()
 		guard length32 >= 5 else {throw BSONSerializationError.dataTooSmall}
 		
 		let length = Int(length32)
-		bufferedInputStream.streamSizeLimit = length
+		let previousStreamSizeLimit: Int?
+		if let bufferedInputStream = bufferStream as? BufferedInputStream {previousStreamSizeLimit = bufferedInputStream.streamSizeLimit; bufferedInputStream.streamSizeLimit = length}
+		else                                                              {previousStreamSizeLimit = nil}
+		defer {if let bufferedInputStream = bufferStream as? BufferedInputStream {bufferedInputStream.streamSizeLimit = previousStreamSizeLimit}}
 		
 		var ret = [String: Any]()
 		
 		var isAtEnd = false
 		while !isAtEnd {
-			guard bufferedInputStream.totalReadBytesCount <= length else {throw BSONSerializationError.invalidLength}
+			guard bufferStream.totalReadBytesCount <= length else {throw BSONSerializationError.invalidLength}
 			
-			let currentElementType: UInt8 = try bufferedInputStream.readType()
+			let currentElementType: UInt8 = try bufferStream.readType()
 			guard currentElementType != BSONElementType.endOfDocument.rawValue else {
 				isAtEnd = true
 				break
 			}
 			
-			let key = try bufferedInputStream.readCString(encoding: .utf8)
+			let key = try bufferStream.readCString(encoding: .utf8)
 			switch BSONElementType(rawValue: currentElementType) {
 			case .null?:
 				ret[key] = nil
 				
 			case .boolean?:
-				let valAsInt8 = try bufferedInputStream.readData(size: 1, alwaysCopyBytes: false).first!
+				let valAsInt8 = try bufferStream.readData(size: 1, alwaysCopyBytes: false).first!
 				switch valAsInt8 {
 				case 0: ret[key] = false
 				case 1: ret[key] = true
@@ -322,30 +309,30 @@ class BSONSerialization {
 				}
 				
 			case .int32Bits?:
-				let val: Int32 = try bufferedInputStream.readType()
+				let val: Int32 = try bufferStream.readType()
 				ret[key] = val
 				
 			case .int64Bits?:
-				let val: Int64 = try bufferedInputStream.readType()
+				let val: Int64 = try bufferStream.readType()
 				ret[key] = val
 				
 			case .double64Bits?:
-				let val: Double = try bufferedInputStream.readType()
+				let val: Double = try bufferStream.readType()
 				ret[key] = val
 				
 			case .double128Bits?:
 				/* Note: We assume Swift will **always** represent tuples the way it
 				 *       currently does and struct won't have any padding... */
-				let val: Double128 = try bufferedInputStream.readType()
+				let val: Double128 = try bufferStream.readType()
 				ret[key] = val
 				
 			case .utcDateTime?:
-				let timestamp: Int64 = try bufferedInputStream.readType()
+				let timestamp: Int64 = try bufferStream.readType()
 				ret[key] = Date(timeIntervalSince1970: TimeInterval(timestamp))
 				
 			case .regularExpression?:
-				let pattern = try bufferedInputStream.readCString(encoding: .utf8)
-				let options = try bufferedInputStream.readCString(encoding: .utf8)
+				let pattern = try bufferStream.readCString(encoding: .utf8)
+				let options = try bufferStream.readCString(encoding: .utf8)
 				var foundationOptions: NSRegularExpression.Options = [.anchorsMatchLines]
 				for c in options.characters {
 					switch c {
@@ -362,7 +349,7 @@ class BSONSerialization {
 				catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
 				
 			case .utf8String?:
-				ret[key] = try bufferedInputStream.readBSONString(encoding: .utf8)
+				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
 				
 			case .dictionary?:
 				fatalError("Not Implemented")
@@ -371,24 +358,24 @@ class BSONSerialization {
 				fatalError("Not Implemented")
 				
 			case .timestamp?:
-				let increment = try bufferedInputStream.readData(size: 4, alwaysCopyBytes: true)
-				let timestamp = try bufferedInputStream.readData(size: 4, alwaysCopyBytes: true)
+				let increment = try bufferStream.readData(size: 4, alwaysCopyBytes: true)
+				let timestamp = try bufferStream.readData(size: 4, alwaysCopyBytes: true)
 				ret[key] = MongoTimestamp(incrementData: increment, timestampData: timestamp)
 				
 			case .binary?:
-				let size: Int32 = try bufferedInputStream.readType()
-				let subtypeInt: UInt8 = try bufferedInputStream.readType()
-				let data = try bufferedInputStream.readData(size: Int(size), alwaysCopyBytes: true)
+				let size: Int32 = try bufferStream.readType()
+				let subtypeInt: UInt8 = try bufferStream.readType()
+				let data = try bufferStream.readData(size: Int(size), alwaysCopyBytes: true)
 				ret[key] = MongoBinary(binaryTypeAsInt: subtypeInt, data: data)
 				
 			case .objectId?:
 				/* Note: We assume Swift will **always** represent tuples the way it
 				 *       currently does and struct won't have any padding... */
-				let val: MongoObjectId = try bufferedInputStream.readType()
+				let val: MongoObjectId = try bufferStream.readType()
 				ret[key] = val
 				
 			case .javascript?:
-				ret[key] = try bufferedInputStream.readBSONString(encoding: .utf8)
+				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
 				
 			case .javascriptWithScope?:
 				fatalError("Not Implemented")
@@ -403,18 +390,18 @@ class BSONSerialization {
 				ret[key] = nil
 				
 			case .dbPointer?:
-				let stringPart = try bufferedInputStream.readBSONString(encoding: .utf8)
-				let bytesPartData = try bufferedInputStream.readData(size: 12, alwaysCopyBytes: true)
+				let stringPart = try bufferStream.readBSONString(encoding: .utf8)
+				let bytesPartData = try bufferStream.readData(size: 12, alwaysCopyBytes: true)
 				ret[key] = MongoDBPointer(stringPart: stringPart, bytesPartData: bytesPartData)
 				
 			case .symbol?:
-				ret[key] = try bufferedInputStream.readBSONString(encoding: .utf8)
+				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
 				
 			case nil: throw BSONSerializationError.invalidElementType(currentElementType)
 			case .endOfDocument?: fatalError() /* Guarded before the switch */
 			}
 		}
-		guard bufferedInputStream.totalReadBytesCount == length else {throw BSONSerializationError.invalidLength}
+		guard bufferStream.totalReadBytesCount == length else {throw BSONSerializationError.invalidLength}
 		return ret
 	}
 	
