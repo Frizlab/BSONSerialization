@@ -20,7 +20,8 @@ struct BSONReadingOptions : OptionSet {
 
 struct BSONWritingOptions : OptionSet {
 	let rawValue: Int
-	/* Empty. We just create the enum in case we want to add something to it later. */
+	
+	static let skipSizes = BSONWritingOptions(rawValue: 1 << 0)
 }
 
 
@@ -175,6 +176,9 @@ class BSONSerialization {
 		If the given length does not match the decoded length, this error is
 		thrown. The expected and actual length are given in the error. */
 		case invalidJSWithScopeLength(expected: Int, actual: Int)
+		
+		/** An error occurred writing the stream. */
+		case cannotWriteToStream(streamError: Error?)
 		
 		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
 		case cannotAllocateMemory(Int)
@@ -472,19 +476,57 @@ class BSONSerialization {
 			throw BSONSerializationError.internalError
 		}
 		defer {CFWriteStreamClose(stream)}
-		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt)
-		guard let data = CFWriteStreamCopyProperty(stream, .dataWritten) as AnyObject as? Data else {
+		
+		var sizes = [Int: Int32]()
+		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt.union([.skipSizes]), sizeFoundCallback: { offset, size in
+			assert(sizes[offset] == nil)
+			sizes[offset] = size
+		})
+		
+		guard var data = CFWriteStreamCopyProperty(stream, .dataWritten) as AnyObject as? Data else {
 			throw BSONSerializationError.internalError
 		}
+		
+		if !opt.contains(.skipSizes) {
+			data.withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in
+				for (offset, size) in sizes {
+					unsafeBitCast(bytes.advanced(by: offset), to: UnsafeMutablePointer<Int32>.self).pointee = size
+				}
+			}
+		}
+		
 		return data
 	}
 	
-	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
-		return 0
+	/** Write BSON object to a write stream.
+	
+	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
+	- Returns: The number of bytes written. */
+	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+		var zero: Int8 = 0
+		var currentWritePosition = 0
+		if opt.contains(.skipSizes) {
+			var s: Int32 = 0
+			currentWritePosition += try write(value: &s, toStream: stream)
+			for (key, val) in BSONObject {
+			}
+		}
+		currentWritePosition += try write(value: &zero, toStream: stream)
+		sizeFoundCallback(initialWritePosition, Int32(currentWritePosition - initialWritePosition))
+		return currentWritePosition
 	}
 	
 	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
 		return false
+	}
+	
+	private class func write<T>(value: inout T, toStream stream: OutputStream) throws -> Int {
+		return try withUnsafePointer(to: &value) { pointer -> Int in
+			let size = MemoryLayout<T>.size
+			let writtenSize = stream.write(unsafeBitCast(pointer, to: UnsafePointer<UInt8>.self), maxLength: size)
+			guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+			return size
+		}
 	}
 	
 }

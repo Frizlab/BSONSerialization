@@ -136,14 +136,36 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	
-//	func testEncodeEmptyBSONToData() {
-//		do {
-//			let ref = "05 00 00 00 00"
-//			let res = try BSONSerialization.data(withBSONObject: [:], options: []).hexEncodedString()
-//			XCTAssertEqual(ref, res)
-//		} catch {
-//			XCTFail("\(error)")
-//		}
-//	}
+	func testEncodeEmptyBSONToData() {
+		do {
+			let ref = "05 00 00 00 00"
+			let res = try BSONSerialization.data(withBSONObject: [:], options: []).hexEncodedString()
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	
+	func testEncodeEmptyBSONToStream() {
+		do {
+			let ref = "05 00 00 00 00"
+			let res = try dataFromWriteStream { _ = try BSONSerialization.write(BSONObject: [:], toStream: $0, options: []) }.hexEncodedString()
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	
+	private func dataFromWriteStream(writeBlock: (_ writeStream: OutputStream) throws -> Void) rethrows -> Data {
+		let stream = CFWriteStreamCreateWithAllocatedBuffers(kCFAllocatorDefault, kCFAllocatorDefault)!
+		guard CFWriteStreamOpen(stream) else {fatalError("Cannot open write stream")}
+		defer {CFWriteStreamClose(stream)}
+		
+		try writeBlock(stream)
+		
+		return CFWriteStreamCopyProperty(stream, .dataWritten) as AnyObject as! Data
+	}
 	
 }
