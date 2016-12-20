@@ -154,12 +154,27 @@ class BSONSerialization {
 		after the string). */
 		case invalidEndOfString(UInt8?)
 		
+		/**
+		An invalid key was found in an array: Keys must be integers, sorted in
+		ascending order from 0 to n-1 (where n = number of elements in the array).
+		
+		- Note: Not so sure the increments from one element to the next should
+		necessarily be of one… The doc is pretty vague on the subject. It says:
+		“[…] with integer values for the keys, starting with 0 and continuing
+		sequentially. […] The keys must be in ascending numerical order.” */
+		case invalidArrayKey(currentKey: String, previousKey: String?)
+		
 		/** Found an invalid regular expression options value (the complete
 		options and the faulty character are given in arg). */
 		case invalidRegularExpressionOptions(options: String, invalidCharacter: Character)
 		/** Found an invalid regular expression value (the regular expression and
 		the parsing error are given in arg). */
 		case invalidRegularExpression(pattern: String, error: Error)
+		
+		/** The JS with scope element gives the raw data length in its definition.
+		If the given length does not match the decoded length, this error is
+		thrown. The expected and actual length are given in the error. */
+		case invalidJSWithScopeLength(expected: Int, actual: Int)
 		
 		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
 		case cannotAllocateMemory(Int)
@@ -268,7 +283,8 @@ class BSONSerialization {
 		return try BSONObject(bufferStream: bufferedInputStream, options: opt)
 	}
 	
-	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions, initialReadPosition: Int = 0) throws -> BSONDoc {
+	/* Note: Whenever we can, I'd like to have a non-escaping optional closure... */
+	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions, initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
@@ -298,37 +314,44 @@ class BSONSerialization {
 			let key = try bufferStream.readCString(encoding: .utf8)
 			switch BSONElementType(rawValue: currentElementType) {
 			case .null?:
+				try decodeCallback(key, nil)
 				ret[key] = nil
 				
 			case .boolean?:
 				let valAsInt8 = try bufferStream.readData(size: 1, alwaysCopyBytes: false).first!
 				switch valAsInt8 {
-				case 0: ret[key] = false
-				case 1: ret[key] = true
+				case 1: try decodeCallback(key, true);  ret[key] = true
+				case 0: try decodeCallback(key, false); ret[key] = false
 				default: throw BSONSerializationError.invalidBooleanValue(valAsInt8)
 				}
 				
 			case .int32Bits?:
 				let val: Int32 = try bufferStream.readType()
+				try decodeCallback(key, val)
 				ret[key] = val
 				
 			case .int64Bits?:
 				let val: Int64 = try bufferStream.readType()
+				try decodeCallback(key, val)
 				ret[key] = val
 				
 			case .double64Bits?:
 				let val: Double = try bufferStream.readType()
+				try decodeCallback(key, val)
 				ret[key] = val
 				
 			case .double128Bits?:
 				/* Note: We assume Swift will **always** represent tuples the way it
 				 *       currently does and struct won't have any padding... */
 				let val: Double128 = try bufferStream.readType()
+				try decodeCallback(key, val)
 				ret[key] = val
 				
 			case .utcDateTime?:
 				let timestamp: Int64 = try bufferStream.readType()
-				ret[key] = Date(timeIntervalSince1970: TimeInterval(timestamp))
+				let val = Date(timeIntervalSince1970: TimeInterval(timestamp))
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .regularExpression?:
 				let pattern = try bufferStream.readCString(encoding: .utf8)
@@ -345,57 +368,93 @@ class BSONSerialization {
 					default: throw BSONSerializationError.invalidRegularExpressionOptions(options: options, invalidCharacter: c)
 					}
 				}
-				do    {ret[key] = try NSRegularExpression(pattern: pattern, options: foundationOptions)}
+				do    {let val = try NSRegularExpression(pattern: pattern, options: foundationOptions); try decodeCallback(key, val); ret[key] = val}
 				catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
 				
 			case .utf8String?:
-				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
+				let val = try bufferStream.readBSONString(encoding: .utf8)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .dictionary?:
-				ret[key] = try BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
+				let val = try BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .array?:
-				fatalError("Not Implemented")
+				var val = [Any?]()
+				var prevKey: String? = nil
+				_ = try BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition, decodeCallback: { subkey, subval in
+					guard String(val.count) == subkey else {throw BSONSerializationError.invalidArrayKey(currentKey: subkey, previousKey: prevKey)}
+					val.append(subval)
+					prevKey = subkey
+				})
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .timestamp?:
 				let increment = try bufferStream.readData(size: 4, alwaysCopyBytes: true)
 				let timestamp = try bufferStream.readData(size: 4, alwaysCopyBytes: true)
-				ret[key] = MongoTimestamp(incrementData: increment, timestampData: timestamp)
+				let val = MongoTimestamp(incrementData: increment, timestampData: timestamp)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .binary?:
 				let size: Int32 = try bufferStream.readType()
 				let subtypeInt: UInt8 = try bufferStream.readType()
 				let data = try bufferStream.readData(size: Int(size), alwaysCopyBytes: true)
-				ret[key] = MongoBinary(binaryTypeAsInt: subtypeInt, data: data)
+				let val = MongoBinary(binaryTypeAsInt: subtypeInt, data: data)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .objectId?:
 				/* Note: We assume Swift will **always** represent tuples the way it
 				 *       currently does and struct won't have any padding... */
 				let val: MongoObjectId = try bufferStream.readType()
+				try decodeCallback(key, val)
 				ret[key] = val
 				
 			case .javascript?:
-				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
+				let val = try bufferStream.readBSONString(encoding: .utf8)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .javascriptWithScope?:
-				fatalError("Not Implemented")
+				let valStartPosition = bufferStream.currentReadPosition
+				
+				let valSize: Int32 = try bufferStream.readType()
+				let jsCode = try bufferStream.readBSONString(encoding: .utf8)
+				let scope = try BSONSerialization.BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
+				guard bufferStream.currentReadPosition - valStartPosition == Int(valSize) else {throw BSONSerializationError.invalidJSWithScopeLength(expected: Int(valSize), actual: bufferStream.currentReadPosition - valStartPosition)}
+				let val = JavascriptWithScope(javascript: jsCode, scope: scope)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .minKey?:
-				ret[key] = MinKey()
+				let val = MinKey()
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .maxKey?:
-				ret[key] = MaxKey()
+				let val = MaxKey()
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .undefined?:
+				try decodeCallback(key, nil)
 				ret[key] = nil
 				
 			case .dbPointer?:
 				let stringPart = try bufferStream.readBSONString(encoding: .utf8)
 				let bytesPartData = try bufferStream.readData(size: 12, alwaysCopyBytes: true)
-				ret[key] = MongoDBPointer(stringPart: stringPart, bytesPartData: bytesPartData)
+				let val = MongoDBPointer(stringPart: stringPart, bytesPartData: bytesPartData)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .symbol?:
-				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
+				let val = try bufferStream.readBSONString(encoding: .utf8)
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case nil: throw BSONSerializationError.invalidElementType(currentElementType)
 			case .endOfDocument?: fatalError() /* Guarded before the switch */

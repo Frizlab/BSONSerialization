@@ -58,6 +58,43 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
+	func testSimpleArrayFromData() {
+		do {
+			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 30 00 04 00 00 00 61 62 63 00 02 31 00 04 00 00 00 64 65 66 00 02 32 00 04 00 00 00 67 68 69 00 00 00")!
+			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+			let e = ["col": ["abc", "def", "ghi"]] as NSDictionary
+			XCTAssertEqual(r, e)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testInvalidFirstKeySimpleArrayFromData() {
+		do {
+			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 31 00 04 00 00 00 61 62 63 00 02 32 00 04 00 00 00 64 65 66 00 02 33 00 04 00 00 00 67 68 69 00 00 00")!
+			_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+			XCTFail("Decoding should have failed.")
+		} catch {
+			switch error {
+			case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "1" && prevKey == nil: (/*Success*/)
+			default: XCTFail("Invalid error thrown \(error)")
+			}
+		}
+	}
+	
+	func testInvalidSecondKeySimpleArrayFromData() {
+		do {
+			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 30 00 04 00 00 00 61 62 63 00 02 32 00 04 00 00 00 64 65 66 00 02 33 00 04 00 00 00 67 68 69 00 00 00")!
+			_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+			XCTFail("Decoding should have failed.")
+		} catch {
+			switch error {
+			case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "2" && prevKey == "0": (/*Success*/)
+			default: XCTFail("Invalid error thrown \(error)")
+			}
+		}
+	}
+	
 	func testPerformanceDecode4242EmptyDictionaryFromData() {
 		let data = Data(hexEncoded: "05 00 00 00 00")!
 		self.measure {
