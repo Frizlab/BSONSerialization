@@ -16,4 +16,3 @@ FOUNDATION_EXPORT const unsigned char BSONSerializationVersionString[];
 
 
 /* Imports like this: #import <BSONSerialization/PublicHeader.h> */
-
