@@ -74,7 +74,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testDecodeEmptyBSONFromStream() {
 		do {
-			let stream = inputStream(fromData: Data(hexEncoded: "05 00 00 00 00")!)!
+			let stream = Data(hexEncoded: "05 00 00 00 00")!.asStream()!
 			CFReadStreamOpen(stream); defer {CFReadStreamClose(stream)}
 			
 			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
@@ -87,7 +87,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testSimpleEmbeddedDocFromStream() {
 		do {
-			let stream = inputStream(fromData: Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!)!
+			let stream = Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!.asStream()!
 			CFReadStreamOpen(stream); defer {CFReadStreamClose(stream)}
 			
 			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
