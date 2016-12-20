@@ -26,23 +26,23 @@ class BufferStreamTests: XCTestCase {
 	}
 	
 	func testReadSmallerThanBufferData() {
-		let s = stream(fromData: Data(hexEncoded: "0123456789")!)!
+		let s = stream(fromData: Data(hexEncoded: "01 23 45 67 89")!)!
 		CFReadStreamOpen(s)
 		defer {CFReadStreamClose(s)}
 		
-		let bs = BufferedInputStream(stream: s, bufferSize: 3, streamSizeLimit: nil)
+		let bs = BufferedInputStream(stream: s, bufferSize: 3, streamReadSizeLimit: nil)
 		let d = try? bs.readData(size: 2, alwaysCopyBytes: false)
-		XCTAssert(d == Data(hexEncoded: "0123")!)
+		XCTAssert(d == Data(hexEncoded: "01 23")!)
 	}
 	
 	func testReadBiggerThanBufferData() {
-		let s = stream(fromData: Data(hexEncoded: "0123456789")!)!
+		let s = stream(fromData: Data(hexEncoded: "01 23 45 67 89")!)!
 		CFReadStreamOpen(s)
 		defer {CFReadStreamClose(s)}
 		
-		let bs = BufferedInputStream(stream: s, bufferSize: 3, streamSizeLimit: nil)
+		let bs = BufferedInputStream(stream: s, bufferSize: 3, streamReadSizeLimit: nil)
 		let d = try? bs.readData(size: 4, alwaysCopyBytes: false)
-		XCTAssert(d == Data(hexEncoded: "01234567")!)
+		XCTAssert(d == Data(hexEncoded: "01 23 45 67")!)
 	}
 	
 	/* ***************

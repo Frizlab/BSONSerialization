@@ -1,5 +1,5 @@
 /*
- * Data+HexEncoding.swift
+ * TestHelpers.swift
  * BSONSerialization
  *
  * Created by François Lamboley on 18/12/2016.
@@ -10,6 +10,17 @@ import Foundation
 
 
 
+func inputStream(fromData data: Data) -> InputStream? {
+	return data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> InputStream in
+		/* We must not release the bytes memory (which explains the latest
+		 * argument to the stream creation function): the data object will do it
+		 * when released (after the stream has finished being used). */
+		return CFReadStreamCreateWithBytesNoCopy(kCFAllocatorDefault, bytes, data.count, kCFAllocatorNull)
+	}
+}
+
+
+
 extension Data {
 	
 	/* "FC"   --> Returns data with bytes [0xFC]
@@ -17,8 +28,10 @@ extension Data {
 	 * "FCA"  --> Returns data with bytes [OxFC, 0x0A]
 	 * "FC0A" --> Returns data with bytes [OxFC, 0x0A]
 	 * ""     --> Returns data with bytes []
-	 */
+	 *
+	 * Spaces are removed from input string ("AB CD 12" == "ABCD12"). */
 	init?(hexEncoded str: String) {
+		let str = str.replacingOccurrences(of: " ", with: "")
 		let size = str.characters.count/2 + (str.characters.count%2 == 0 ? 0 : 1)
 		var bytes = [UInt8](repeating: 0, count: size)
 		for (i, c) in str.characters.enumerated() {
@@ -48,10 +61,13 @@ extension Data {
 		self.init(bytes: bytes)
 	}
 	
-	func hexEncodedString() -> String {
+	func hexEncodedString(withSpaces: Bool = true) -> String {
 		var res = ""
+		var first = true
 		for b in self {
+			if !first && withSpaces {res += " "}
 			res += String(format: "%02x", b)
+			first = false
 		}
 		return res
 	}

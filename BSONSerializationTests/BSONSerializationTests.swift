@@ -25,9 +25,9 @@ class BSONSerializationTests: XCTestCase {
 		super.tearDown()
 	}
 	
-	func testDecodeEmptyBSON() {
+	func testDecodeEmptyBSONFromData() {
 		do {
-			let data = Data(hexEncoded: "0500000000")!
+			let data = Data(hexEncoded: "05 00 00 00 00")!
 			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = [String: Any]() as NSDictionary
 			XCTAssertEqual(r, e)
@@ -36,19 +36,9 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
-	func testEncodeEmptyBSON() {
+	func testDecodeKeyAbcValDefFromData() {
 		do {
-			let ref = "0500000000"
-			let res = try BSONSerialization.data(withBSONObject: [:], options: []).hexEncodedString()
-			XCTAssertEqual(ref, res)
-		} catch {
-			XCTFail("\(error)")
-		}
-	}
-	
-	func testDecodeKeyAbcValDef() {
-		do {
-			let data = Data(hexEncoded: "120000000261626300040000006465660000")!
+			let data = Data(hexEncoded: "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00")!
 			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
 			let e = ["abc": "def"] as NSDictionary
 			XCTAssertEqual(r, e)
@@ -57,8 +47,19 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
-	func testPerformanceDecode4242EmptyDictionary() {
-		let data = Data(hexEncoded: "0500000000")!
+	func testSimpleEmbeddedDocFromData() {
+		do {
+			let data = Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!
+			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+			let e = ["doc": ["abc": "def"]] as NSDictionary
+			XCTAssertEqual(r, e)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testPerformanceDecode4242EmptyDictionaryFromData() {
+		let data = Data(hexEncoded: "05 00 00 00 00")!
 		self.measure {
 			for _ in 0..<4242 {
 				do {
@@ -69,5 +70,43 @@ class BSONSerializationTests: XCTestCase {
 			}
 		}
 	}
+	
+	
+	func testDecodeEmptyBSONFromStream() {
+		do {
+			let stream = inputStream(fromData: Data(hexEncoded: "05 00 00 00 00")!)!
+			CFReadStreamOpen(stream); defer {CFReadStreamClose(stream)}
+			
+			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
+			let e = [String: Any]() as NSDictionary
+			XCTAssertEqual(r, e)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testSimpleEmbeddedDocFromStream() {
+		do {
+			let stream = inputStream(fromData: Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!)!
+			CFReadStreamOpen(stream); defer {CFReadStreamClose(stream)}
+			
+			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
+			let e = ["doc": ["abc": "def"]] as NSDictionary
+			XCTAssertEqual(r, e)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	
+//	func testEncodeEmptyBSONToData() {
+//		do {
+//			let ref = "05 00 00 00 00"
+//			let res = try BSONSerialization.data(withBSONObject: [:], options: []).hexEncodedString()
+//			XCTAssertEqual(ref, res)
+//		} catch {
+//			XCTFail("\(error)")
+//		}
+//	}
 	
 }

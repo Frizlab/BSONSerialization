@@ -264,11 +264,11 @@ class BSONSerialization {
 	- Returns: The serialized BSON data.
 	*/
 	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
-		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamSizeLimit: nil)
+		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamReadSizeLimit: nil)
 		return try BSONObject(bufferStream: bufferedInputStream, options: opt)
 	}
 	
-	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions) throws -> BSONDoc {
+	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions, initialReadPosition: Int = 0) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
@@ -278,16 +278,16 @@ class BSONSerialization {
 		guard length32 >= 5 else {throw BSONSerializationError.dataTooSmall}
 		
 		let length = Int(length32)
-		let previousStreamSizeLimit: Int?
-		if let bufferedInputStream = bufferStream as? BufferedInputStream {previousStreamSizeLimit = bufferedInputStream.streamSizeLimit; bufferedInputStream.streamSizeLimit = length}
-		else                                                              {previousStreamSizeLimit = nil}
-		defer {if let bufferedInputStream = bufferStream as? BufferedInputStream {bufferedInputStream.streamSizeLimit = previousStreamSizeLimit}}
+		let previousStreamReadSizeLimit: Int?
+		if let bufferedInputStream = bufferStream as? BufferedInputStream {previousStreamReadSizeLimit = bufferedInputStream.streamReadSizeLimit; bufferedInputStream.streamReadSizeLimit = initialReadPosition + length}
+		else                                                              {previousStreamReadSizeLimit = nil}
+		defer {if let bufferedInputStream = bufferStream as? BufferedInputStream {bufferedInputStream.streamReadSizeLimit = previousStreamReadSizeLimit}}
 		
 		var ret = [String: Any]()
 		
 		var isAtEnd = false
 		while !isAtEnd {
-			guard bufferStream.totalReadBytesCount <= length else {throw BSONSerializationError.invalidLength}
+			guard bufferStream.currentReadPosition - initialReadPosition <= length else {throw BSONSerializationError.invalidLength}
 			
 			let currentElementType: UInt8 = try bufferStream.readType()
 			guard currentElementType != BSONElementType.endOfDocument.rawValue else {
@@ -352,7 +352,7 @@ class BSONSerialization {
 				ret[key] = try bufferStream.readBSONString(encoding: .utf8)
 				
 			case .dictionary?:
-				fatalError("Not Implemented")
+				ret[key] = try BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
 				
 			case .array?:
 				fatalError("Not Implemented")
@@ -401,7 +401,7 @@ class BSONSerialization {
 			case .endOfDocument?: fatalError() /* Guarded before the switch */
 			}
 		}
-		guard bufferStream.totalReadBytesCount == length else {throw BSONSerializationError.invalidLength}
+		guard bufferStream.currentReadPosition - initialReadPosition == length else {throw BSONSerializationError.invalidLength}
 		return ret
 	}
 	

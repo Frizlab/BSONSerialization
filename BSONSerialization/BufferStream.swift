@@ -22,7 +22,7 @@ enum BufferStreamError : Error {
 	max number of bytes allowed to be read. For optimization reasons, we might
 	throw this error before all the bytes have actually been read from the
 	stream. */
-	case streamSizeLimitReached
+	case streamReadSizeLimitReached
 	
 	/** An error occurred reading the stream. */
 	case streamReadError(streamError: Error?)
@@ -103,8 +103,12 @@ enum BufferStreamDelimiterMatchingMode {
 
 internal protocol BufferStream {
 	
-	/** The total number of bytes read from the source. */
-	var totalReadBytesCount: Int {get}
+	/** The index of the first byte returned from the stream at the next read,
+	where 0 is the first byte of the stream.
+	
+	This is also the number of bytes that has been returned by the different read
+	methods of the stream. */
+	var currentReadPosition: Int {get}
 	
 	/** Read the given size from the buffer and returns it in a Data object.
 	
@@ -172,38 +176,28 @@ internal class BufferedInputStream : BufferStream {
 	
 	let sourceStream: InputStream
 	
-	/* Note: These two variables basically describe an UnsafeRawBufferPointer */
-	let defaultSizedBuffer: UnsafeMutablePointer<UInt8>
-	let defaultBufferSize: Int
-	
-	var buffer: UnsafeMutablePointer<UInt8>
-	var bufferSize: Int
-	
-	var bufferStartPos: Int
-	var bufferValidLength: Int
-	
-	var totalReadBytesCount = 0
+	var currentReadPosition = 0
 	
 	/** The maximum total number of bytes to read from the stream. Can be changed
 	after some bytes have been read.
 	
 	If set to nil, there are no limits.
-
+	
 	If set to a value lower than or equal to the current total number of bytes
 	read, no more bytes will be read from the stream, and the
-	`.streamSizeLimitReached` error will be thrown when trying to read more data
-	(if the current internal buffer end is reached). */
-	var streamSizeLimit: Int?
+	`.streamReadSizeLimitReached` error will be thrown when trying to read more
+	data (if the current internal buffer end is reached). */
+	var streamReadSizeLimit: Int?
 	
 	/** Initializes a BufferedInputStream.
 	
 	- Parameter stream: The stream to read data from. Must be opened.
 	- Parameter bufferSize: The size of the buffer to use to read from the
 	stream. Sometimes, more memory might be allocated if needed for some reads.
-	- Parameter streamSizeLimit: The maximum number of bytes allowed to be read
-	from the stream.
+	- Parameter streamReadSizeLimit: The maximum number of bytes allowed to be
+	read from the stream.
 	*/
-	init(stream: InputStream, bufferSize size: Int, streamSizeLimit streamLimit: Int?) {
+	init(stream: InputStream, bufferSize size: Int, streamReadSizeLimit streamLimit: Int?) {
 		assert(size > 0)
 		
 		sourceStream = stream
@@ -218,7 +212,7 @@ internal class BufferedInputStream : BufferStream {
 		bufferStartPos = 0
 		bufferValidLength = 0
 		totalReadBytesCount = 0
-		streamSizeLimit = streamLimit
+		streamReadSizeLimit = streamLimit
 	}
 	
 	deinit {
@@ -226,6 +220,12 @@ internal class BufferedInputStream : BufferStream {
 	}
 	
 	func readData(size: Int, alwaysCopyBytes: Bool) throws -> Data {
+		let data = try readDataNoCurrentPosIncrement(size: size, alwaysCopyBytes: alwaysCopyBytes)
+		currentReadPosition += data.count
+		return data
+	}
+	
+	private func readDataNoCurrentPosIncrement(size: Int, alwaysCopyBytes: Bool) throws -> Data {
 		let bufferStart = buffer.advanced(by: bufferStartPos)
 		
 		switch size {
@@ -241,7 +241,7 @@ internal class BufferedInputStream : BufferStream {
 				bufferValidLength: &bufferValidLength,
 				bufferSize: bufferSize,
 				totalReadBytesCount: &totalReadBytesCount,
-				maxTotalReadBytesCount: streamSizeLimit,
+				maxTotalReadBytesCount: streamReadSizeLimit,
 				stream: sourceStream
 			)
 			
@@ -264,7 +264,7 @@ internal class BufferedInputStream : BufferStream {
 				bufferValidLength: &bufferValidLength,
 				bufferSize: bufferSize,
 				totalReadBytesCount: &totalReadBytesCount,
-				maxTotalReadBytesCount: streamSizeLimit,
+				maxTotalReadBytesCount: streamReadSizeLimit,
 				stream: sourceStream
 			)
 			
@@ -282,7 +282,7 @@ internal class BufferedInputStream : BufferStream {
 				bufferValidLength: &bufferValidLength,
 				bufferSize: bufferSize,
 				totalReadBytesCount: &totalReadBytesCount,
-				maxTotalReadBytesCount: streamSizeLimit,
+				maxTotalReadBytesCount: streamReadSizeLimit,
 				stream: sourceStream
 			)
 			
@@ -309,7 +309,7 @@ internal class BufferedInputStream : BufferStream {
 				bufferValidLength: &newValidLength,
 				bufferSize: size,
 				totalReadBytesCount: &totalReadBytesCount,
-				maxTotalReadBytesCount: streamSizeLimit,
+				maxTotalReadBytesCount: streamReadSizeLimit,
 				stream: sourceStream
 			)
 		}
@@ -329,6 +329,7 @@ internal class BufferedInputStream : BufferStream {
 			if let returnedLength = matchDelimiters(inData: bufferSearchData, usingMatchingMode: matchingMode, includeDelimiter: includeDelimiter, minDelimiterLength: minDelimiterLength, withUnmatchedDelimiters: &unmatchedDelimiters, matchedDatas: &matchedDatas) {
 				bufferStartPos += returnedLength
 				bufferValidLength -= returnedLength
+				currentReadPosition += returnedLength
 				return (alwaysCopyBytes ? Data(bytes: bufferStart, count: returnedLength) : Data(bytesNoCopy: bufferStart, count: returnedLength, deallocator: .none))
 			}
 			
@@ -362,8 +363,8 @@ internal class BufferedInputStream : BufferStream {
 			/* Let's read from the stream now! */
 			let sizeToRead: Int
 			let unmaxedSizeToRead = bufferSize - (bufferStartPos + bufferValidLength) /* The remaining space in the buffer */
-			if let maxTotalReadBytesCount = streamSizeLimit {sizeToRead = min(unmaxedSizeToRead, maxTotalReadBytesCount - totalReadBytesCount /* Number of bytes remaining allowed to be read */)}
-			else                                            {sizeToRead =     unmaxedSizeToRead}
+			if let maxTotalReadBytesCount = streamReadSizeLimit {sizeToRead = min(unmaxedSizeToRead, max(0, maxTotalReadBytesCount - totalReadBytesCount) /* Number of bytes remaining allowed to be read */)}
+			else                                                {sizeToRead =     unmaxedSizeToRead}
 			
 			assert(sizeToRead >= 0)
 			if sizeToRead == 0 {/* End of the (allowed) data */break}
@@ -372,13 +373,13 @@ internal class BufferedInputStream : BufferStream {
 			guard sizeRead >  0 else {/* End of the data */break}
 			bufferValidLength += sizeRead
 			totalReadBytesCount += sizeRead
+			assert(streamReadSizeLimit == nil || totalReadBytesCount <= streamReadSizeLimit!)
 		} while true
-		
-		assert(streamSizeLimit == nil || totalReadBytesCount <= streamSizeLimit!)
 		
 		if let returnedLength = findBestMatch(fromMatchedDatas: matchedDatas, usingMatchingMode: matchingMode) {
 			bufferStartPos += returnedLength
 			bufferValidLength -= returnedLength
+			currentReadPosition += returnedLength
 			return (alwaysCopyBytes ? Data(bytes: buffer.advanced(by: bufferStartPos), count: returnedLength) : Data(bytesNoCopy: buffer.advanced(by: bufferStartPos), count: returnedLength, deallocator: .none))
 		}
 		
@@ -388,12 +389,30 @@ internal class BufferedInputStream : BufferStream {
 			let returnedLength = bufferValidLength
 			let bufferStart = buffer.advanced(by: bufferStartPos)
 			
+			currentReadPosition += bufferValidLength
 			bufferStartPos += bufferValidLength
 			bufferValidLength = 0
 			
 			return (alwaysCopyBytes ? Data(bytes: bufferStart, count: returnedLength) : Data(bytesNoCopy: bufferStart, count: returnedLength, deallocator: .none))
 		}
 	}
+	
+	/* ***************
+	   MARK: - Private
+	   *************** */
+	
+	/* Note: These two variables basically describe an UnsafeRawBufferPointer */
+	private let defaultSizedBuffer: UnsafeMutablePointer<UInt8>
+	private let defaultBufferSize: Int
+	
+	private var buffer: UnsafeMutablePointer<UInt8>
+	private var bufferSize: Int
+	
+	private var bufferStartPos: Int
+	private var bufferValidLength: Int
+	
+	/** The total number of bytes read from the source stream. */
+	private var totalReadBytesCount = 0
 	
 }
 
@@ -403,11 +422,7 @@ internal class BufferedData : BufferStream {
 	
 	let sourceData: Data
 	let sourceDataSize: Int
-	var currentPosition = 0
-	
-	var totalReadBytesCount: Int {
-		return currentPosition
-	}
+	var currentReadPosition = 0
 	
 	init(data: Data) {
 		sourceData = data
@@ -415,7 +430,7 @@ internal class BufferedData : BufferStream {
 	}
 	
 	func readData(size: Int, alwaysCopyBytes: Bool) throws -> Data {
-		guard (sourceDataSize - currentPosition) >= size else {throw BufferStreamError.noMoreData}
+		guard (sourceDataSize - currentReadPosition) >= size else {throw BufferStreamError.noMoreData}
 		
 		return getNextSubData(size: size, alwaysCopyBytes: alwaysCopyBytes)
 	}
@@ -427,22 +442,22 @@ internal class BufferedData : BufferStream {
 		var matchedDatas = [(delimiterIdx: Int, dataLength: Int)]()
 		
 		return try sourceData.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Data in
-			let searchedData = Data(bytesNoCopy: unsafeBitCast(bytes, to: UnsafeMutablePointer<UInt8>.self).advanced(by: currentPosition), count: sourceDataSize-currentPosition, deallocator: .none)
+			let searchedData = Data(bytesNoCopy: unsafeBitCast(bytes, to: UnsafeMutablePointer<UInt8>.self).advanced(by: currentReadPosition), count: sourceDataSize-currentReadPosition, deallocator: .none)
 			if let returnedLength = matchDelimiters(inData: searchedData, usingMatchingMode: matchingMode, includeDelimiter: includeDelimiter, minDelimiterLength: minDelimiterLength, withUnmatchedDelimiters: &unmatchedDelimiters, matchedDatas: &matchedDatas) {
 				return getNextSubData(size: returnedLength, alwaysCopyBytes: alwaysCopyBytes)
 			}
 			if let returnedLength = findBestMatch(fromMatchedDatas: matchedDatas, usingMatchingMode: matchingMode) {
 				return getNextSubData(size: returnedLength, alwaysCopyBytes: alwaysCopyBytes)
 			}
-			if delimiters.count == 0 {return getNextSubData(size: sourceDataSize - currentPosition, alwaysCopyBytes: alwaysCopyBytes)}
+			if delimiters.count == 0 {return getNextSubData(size: sourceDataSize - currentReadPosition, alwaysCopyBytes: alwaysCopyBytes)}
 			else                     {throw BufferStreamError.delimitersNotFound}
 		}
 	}
 	
 	private func getNextSubData(size: Int, alwaysCopyBytes: Bool) -> Data {
-		let nextPosition = currentPosition + size
-		let range = Range<Int>(currentPosition..<nextPosition)
-		currentPosition = nextPosition
+		let nextPosition = currentReadPosition + size
+		let range = Range<Int>(currentReadPosition..<nextPosition)
+		currentReadPosition = nextPosition
 		
 		if alwaysCopyBytes {return sourceData.subdata(in: range)}
 		else               {return sourceData.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Data in
@@ -504,7 +519,7 @@ private func readDataInBigEnoughBuffer(dataSize size: Int, allowReadingMore: Boo
 		/* We must read from the stream. */
 		if let maxTotalReadBytesCount = maxTotalReadBytesCount, maxTotalReadBytesCount < totalReadBytesCount || size - bufferValidLength /* To read from stream */ > maxTotalReadBytesCount - totalReadBytesCount /* Remaining allowed bytes to be read */ {
 			/* We have to read more bytes from the stream than allowed. We bail. */
-			throw BufferStreamError.streamSizeLimitReached
+			throw BufferStreamError.streamReadSizeLimitReached
 		}
 		
 		repeat {
@@ -523,10 +538,9 @@ private func readDataInBigEnoughBuffer(dataSize size: Int, allowReadingMore: Boo
 			}
 			bufferValidLength += sizeRead
 			totalReadBytesCount += sizeRead
+			assert(maxTotalReadBytesCount == nil || totalReadBytesCount <= maxTotalReadBytesCount!)
 		} while bufferValidLength < size /* Reading until we have enough data in the buffer. */
 	}
-	
-	assert(maxTotalReadBytesCount == nil || totalReadBytesCount <= maxTotalReadBytesCount!)
 	
 	bufferValidLength -= size
 	bufferStartPos += size

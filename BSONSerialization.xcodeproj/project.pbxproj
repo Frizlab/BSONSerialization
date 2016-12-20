@@ -9,7 +9,7 @@
 /* Begin PBXBuildFile section */
 		7B1120571DF4708B0048AE37 /* BufferStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1120561DF4708B0048AE37 /* BufferStream.swift */; };
 		7B2FA1B61E06997300087805 /* BufferedInputStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */; };
-		7B2FA1B81E069E7500087805 /* Data+HexEncoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2FA1B71E069E7500087805 /* Data+HexEncoding.swift */; };
+		7B2FA1B81E069E7500087805 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2FA1B71E069E7500087805 /* TestHelpers.swift */; };
 		7BC105811C4C425C004CFB30 /* BSONSerialization.h in Headers */ = {isa = PBXBuildFile; fileRef = 7BC105801C4C425C004CFB30 /* BSONSerialization.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		7BC105881C4C425C004CFB30 /* BSONSerialization.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */; };
 		7BC1058D1C4C425C004CFB30 /* BSONSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */; };
@@ -29,7 +29,7 @@
 /* Begin PBXFileReference section */
 		7B1120561DF4708B0048AE37 /* BufferStream.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferStream.swift; sourceTree = "<group>"; };
 		7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferedInputStreamTests.swift; sourceTree = "<group>"; };
-		7B2FA1B71E069E7500087805 /* Data+HexEncoding.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Data+HexEncoding.swift"; sourceTree = "<group>"; };
+		7B2FA1B71E069E7500087805 /* TestHelpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BSONSerialization.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BC105801C4C425C004CFB30 /* BSONSerialization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSONSerialization.h; sourceTree = "<group>"; };
 		7BC105821C4C425C004CFB30 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -90,7 +90,7 @@
 		7BC1058B1C4C425C004CFB30 /* BSONSerializationTests */ = {
 			isa = PBXGroup;
 			children = (
-				7B2FA1B71E069E7500087805 /* Data+HexEncoding.swift */,
+				7B2FA1B71E069E7500087805 /* TestHelpers.swift */,
 				7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */,
 				7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */,
 				7BC1058E1C4C425C004CFB30 /* Info.plist */,
@@ -217,7 +217,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7B2FA1B81E069E7500087805 /* Data+HexEncoding.swift in Sources */,
+				7B2FA1B81E069E7500087805 /* TestHelpers.swift in Sources */,
 				7BC1058D1C4C425C004CFB30 /* BSONSerializationTests.swift in Sources */,
 				7B2FA1B61E06997300087805 /* BufferedInputStreamTests.swift in Sources */,
 			);
