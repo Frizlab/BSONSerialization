@@ -65,7 +65,11 @@
 				7BC1058B1C4C425C004CFB30 /* BSONSerializationTests */,
 				7BC1057E1C4C425C004CFB30 /* Products */,
 			);
+			indentWidth = 3;
 			sourceTree = "<group>";
+			tabWidth = 3;
+			usesTabs = 1;
+			wrapsLines = 0;
 		};
 		7BC1057E1C4C425C004CFB30 /* Products */ = {
 			isa = PBXGroup;
