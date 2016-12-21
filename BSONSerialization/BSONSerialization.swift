@@ -79,6 +79,12 @@ class BSONSerialization {
 		
 	}
 	
+	struct Javascript {
+		
+		let javascript: String
+		
+	}
+	
 	struct JavascriptWithScope {
 		
 		let javascript: String
@@ -230,7 +236,7 @@ class BSONSerialization {
 		case binary              = 0x05
 		/** `.MongoObjectId`. 12 bytes, used by MongoDB. */
 		case objectId            = 0x07
-		/** `String`. */
+		/** `Javascript`. (Basically a container for a `String`.) */
 		case javascript          = 0x0D
 		/**
 		`.JavascriptWithScope`. Raw value is an Int32 representing the length of
@@ -289,7 +295,7 @@ class BSONSerialization {
 	
 	/* Note: Whenever we can, I'd like to have a non-escaping optional closure... */
 	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions, initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
-		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower in size than Int")
+		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		/* TODO: Handle endianness! */
@@ -419,7 +425,7 @@ class BSONSerialization {
 				ret[key] = val
 				
 			case .javascript?:
-				let val = try bufferStream.readBSONString(encoding: .utf8)
+				let val = Javascript(javascript: try bufferStream.readBSONString(encoding: .utf8))
 				try decodeCallback(key, val)
 				ret[key] = val
 				
@@ -516,8 +522,91 @@ class BSONSerialization {
 		return currentWritePosition
 	}
 	
+	class func sizesOfBSONObject(_ obj: BSONDoc) -> [Int]? {
+		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
+		precondition(MemoryLayout<Int>.size <= MemoryLayout<Int64>.size, "I currently need Int to be lower or equal in size than Int64")
+		
+		var curSize = 4 /* Size of the BSON Doc */
+		var sizes = [Int]()
+		for (key, val) in obj {
+			guard let sizesInfo = sizesForBSONEntity(val, withKey: key) else {return nil}
+			sizes.insert(contentsOf: sizesInfo.1, at: 0)
+			curSize += sizesInfo.0
+		}
+		curSize += 1 /* The zero-terminator for BSON docs */
+		sizes.insert(curSize, at: 0)
+		return sizes
+	}
+	
 	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
 		return false
+	}
+	
+	private class func sizesForBSONEntity(_ entity: Any?, withKey key: String) -> (Int /* Size for whole entity with key */, [Int] /* Subsizes (often empty) */)? {
+		var subSizes = [Int]()
+		
+		var size = 1 /* Type of the element */
+		size += key.lengthOfBytes(using: .utf8) + 1 /* Size of the encoded key */
+		
+		switch entity {
+		case nil: (/*nop; this value does not have anything to write*/)
+		case _ as Bool:                        size += 1
+		case _ as Int32, _ as Int64, _ as Int: size += MemoryLayout.size(ofValue: entity!)
+		case _ as Double:                      size += 8  /* 64  bits is 8  bytes */
+		case _ as Double128:                   size += 16 /* 128 bits is 16 bytes */
+		case _ as Date:                        size += 8  /* Encoded as an Int64 */
+			
+		case _ as NSRegularExpression: fatalError("Not Implemented (TODO)")
+			
+		case let str as String: size += sizeOfBSONEncodedString(str)
+			
+		case let subObj as BSONDoc:
+			guard let s = sizesOfBSONObject(subObj), let subObjSize = s.first else {return nil}
+			size += subObjSize
+			subSizes = s
+			
+		case let array as [Any?]:
+			var arraySize = 4 /* The size of the BSON doc (an array is a BSON doc) */
+			for (i, elt) in array.enumerated() {
+				guard let sizesInfo = sizesForBSONEntity(elt, withKey: String(i)) else {return nil}
+				subSizes.append(contentsOf: sizesInfo.1)
+				arraySize += sizesInfo.0
+			}
+			arraySize += 1 /* The zero terminator for a BSON doc */
+			subSizes.insert(arraySize, at: 0)
+			size += arraySize
+			
+		case     _   as MongoTimestamp: size += 8
+		case let bin as MongoBinary:    size += 4 /* Size of the data */ + 1 /* Binary subtype */ + bin.data.count
+		case     _   as MongoObjectId:  size += 12
+		case let js  as Javascript:     size += sizeOfBSONEncodedString(js.javascript)
+			
+		case let sjs as JavascriptWithScope:
+			var jsWithScopeSize = 4 /* Size of the whole jsWithScope entry */
+			jsWithScopeSize += sizeOfBSONEncodedString(sjs.javascript)
+			guard let s = sizesOfBSONObject(sjs.scope), let subObjSize = s.first else {return nil}
+			jsWithScopeSize += subObjSize
+			size += jsWithScopeSize
+			
+			subSizes = s
+			subSizes.insert(jsWithScopeSize, at: 0)
+			
+		case _ as MinKey: (/*nop; this value does not have anything to write*/)
+		case _ as MaxKey: (/*nop; this value does not have anything to write*/)
+			
+		case let dbPointer as MongoDBPointer:
+			size += sizeOfBSONEncodedString(dbPointer.stringPart)
+			size += 12
+			
+		default:
+			return nil
+		}
+		
+		return (size, subSizes)
+	}
+	
+	private class func sizeOfBSONEncodedString(_ str: String) -> Int {
+		return 4 /* length of the string is represented as an Int32 */ + str.lengthOfBytes(using: .utf8) + 1 /* The '\0' terminator */
 	}
 	
 	private class func write<T>(value: inout T, toStream stream: OutputStream) throws -> Int {

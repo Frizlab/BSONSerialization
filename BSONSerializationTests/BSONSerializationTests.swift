@@ -136,6 +136,27 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	
+	func testSizeEmptyBSON() {
+		let ref = [5]
+		guard let res = BSONSerialization.sizesOfBSONObject([:]) else {XCTFail("Cannot compute size of object"); return}
+		XCTAssertEqual(res, ref)
+	}
+	
+	
+	func testSizeSimpleEmbeddedBSON() {
+		let ref = [28, 18]
+		guard let res = BSONSerialization.sizesOfBSONObject(["doc": ["abc": "def"]]) else {XCTFail("Cannot compute size of object"); return}
+		XCTAssertEqual(res, ref)
+	}
+	
+	
+	func testSizeEmbeddedArrayBSON() {
+		let ref = [48, 38]
+		guard let res = BSONSerialization.sizesOfBSONObject(["col": ["abc", "def", "ghi"]]) else {XCTFail("Cannot compute size of object"); return}
+		XCTAssertEqual(res, ref)
+	}
+	
+	
 	func testEncodeEmptyBSONToData() {
 		do {
 			let ref = "05 00 00 00 00"
