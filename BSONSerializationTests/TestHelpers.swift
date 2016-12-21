@@ -58,7 +58,7 @@ extension Data {
 			res += String(format: "%02x", b)
 			first = false
 		}
-		return res
+		return res.uppercased()
 	}
 	
 	func asStream() -> InputStream? {

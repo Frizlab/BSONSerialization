@@ -197,11 +197,31 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
+	func testEncodeEmptySimpleEmbeddedBSONToData() {
+		do {
+			let ref = "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00"
+			let res = try BSONSerialization.data(withBSONObject: ["doc": ["abc": "def"]], options: []).hexEncodedString()
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
 	
 	func testEncodeEmptyBSONToStream() {
 		do {
 			let ref = "05 00 00 00 00"
 			let res = try dataFromWriteStream { _ = try BSONSerialization.write(BSONObject: [:], toStream: $0, options: []) }.hexEncodedString()
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeEmptySimpleEmbeddedBSONToStream() {
+		do {
+			let ref = "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00"
+			let res = try dataFromWriteStream { _ = try BSONSerialization.write(BSONObject: ["doc": ["abc": "def"]], toStream: $0, options: []) }.hexEncodedString()
 			XCTAssertEqual(res, ref)
 		} catch {
 			XCTFail("\(error)")

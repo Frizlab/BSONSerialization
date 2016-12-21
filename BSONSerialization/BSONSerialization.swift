@@ -701,11 +701,11 @@ final class BSONSerialization {
 			size += try write(CEncodedString: key, toStream: stream)
 			size += try write(BSONEncodedString: str, toStream: stream)
 			
-//		case let subObj as BSONDoc:
-//			guard let s = sizesOfBSONObject(subObj), let subObjSize = s.first else {return nil}
-//			size += subObjSize
-//			subSizes = s
-
+		case let subObj as BSONDoc:
+			size += try write(elementType: .dictionary, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(BSONObject: subObj, toStream: stream, options: opt, initialWritePosition: initialWritePosition + size, sizeFoundCallback: sizeFoundCallback)
+			
 //		case let array as [Any?]:
 //			var arraySize = 4 /* The size of the BSON doc (an array is a BSON doc) */
 //			for (i, elt) in array.enumerated() {
@@ -716,7 +716,7 @@ final class BSONSerialization {
 //			arraySize += 1 /* The zero terminator for a BSON doc */
 //			subSizes.insert(arraySize, at: 0)
 //			size += arraySize
-//			
+			
 //		case     _   as MongoTimestamp: size += 8
 //		case let bin as MongoBinary:    size += 4 /* Size of the data */ + 1 /* Binary subtype */ + bin.data.count
 //		case     _   as MongoObjectId:  size += 12
