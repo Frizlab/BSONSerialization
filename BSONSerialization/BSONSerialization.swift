@@ -539,7 +539,7 @@ class BSONSerialization {
 	}
 	
 	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
-		return false
+		return sizesOfBSONObject(obj) != nil
 	}
 	
 	private class func sizesForBSONEntity(_ entity: Any?, withKey key: String) -> (Int /* Size for whole entity with key */, [Int] /* Subsizes (often empty) */)? {
