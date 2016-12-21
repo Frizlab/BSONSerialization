@@ -540,7 +540,7 @@ final class BSONSerialization {
 		
 		/* If skipping sizes, we have to call the callback for size found (the doc
 		 * is written entirely, we now know its size! */
-		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition - initialWritePosition))}
+		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition))}
 		
 		/* The current write position is indeed the number of bytes written... */
 		return currentRelativeWritePosition
