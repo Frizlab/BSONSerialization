@@ -137,23 +137,43 @@ class BSONSerializationTests: XCTestCase {
 	
 	
 	func testSizeEmptyBSON() {
-		let ref = [5]
-		guard let res = BSONSerialization.sizesOfBSONObject([:]) else {XCTFail("Cannot compute size of object"); return}
-		XCTAssertEqual(res, ref)
+		do {
+			let ref = [5]
+			let res = try BSONSerialization.sizesOfBSONObject([:])
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
 	}
-	
 	
 	func testSizeSimpleEmbeddedBSON() {
-		let ref = [28, 18]
-		guard let res = BSONSerialization.sizesOfBSONObject(["doc": ["abc": "def"]]) else {XCTFail("Cannot compute size of object"); return}
-		XCTAssertEqual(res, ref)
+		do {
+			let ref = [18, 28]
+			let res = try BSONSerialization.sizesOfBSONObject(["doc": ["abc": "def"]])
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
 	}
 	
-	
 	func testSizeEmbeddedArrayBSON() {
-		let ref = [48, 38]
-		guard let res = BSONSerialization.sizesOfBSONObject(["col": ["abc", "def", "ghi"]]) else {XCTFail("Cannot compute size of object"); return}
-		XCTAssertEqual(res, ref)
+		do {
+			let ref = [38, 48]
+			let res = try BSONSerialization.sizesOfBSONObject(["col": ["abc", "def", "ghi"]])
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testSizeEmbeddedBSONsInArrayBSON() {
+		do {
+			let ref = [14, 18, 43, 50]
+			let res = try BSONSerialization.sizesOfBSONObject(["": [["abc": "def"], ["g": "h"]]])
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
 	}
 	
 	
@@ -161,6 +181,16 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref = "05 00 00 00 00"
 			let res = try BSONSerialization.data(withBSONObject: [:], options: []).hexEncodedString()
+			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeEmptySimpleBSONToData() {
+		do {
+			let ref = "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00"
+			let res = try BSONSerialization.data(withBSONObject: ["abc": "def"], options: []).hexEncodedString()
 			XCTAssertEqual(res, ref)
 		} catch {
 			XCTFail("\(error)")

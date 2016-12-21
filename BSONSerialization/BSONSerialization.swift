@@ -186,6 +186,13 @@ class BSONSerialization {
 		/** An error occurred writing the stream. */
 		case cannotWriteToStream(streamError: Error?)
 		
+		/** An invalid BSON object was given to be serialized. The invalid element
+		is passed in argument to this error. */
+		case invalidBSONObject(invalidElement: Any)
+		/** One of the key cannot be serialized in an unambiguous way. Said key is
+		given in arg of the error. */
+		case unserializableKey(String)
+		
 		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
 		case cannotAllocateMemory(Int)
 		/** An internal error occurred rendering the serialization impossible. */
@@ -509,44 +516,61 @@ class BSONSerialization {
 	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
 	- Returns: The number of bytes written. */
 	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+		let skipSizes = opt.contains(.skipSizes)
+		
 		var zero: Int8 = 0
-		var currentWritePosition = 0
-		if opt.contains(.skipSizes) {
-			var s: Int32 = 0
-			currentWritePosition += try write(value: &s, toStream: stream)
-			for (key, val) in BSONObject {
-			}
+		
+		var sizes: [Int]?
+		var docSize: Int32
+		var currentRelativeWritePosition = 0
+		
+		if skipSizes {sizes = nil;                               docSize = 0}
+		else         {sizes = try sizesOfBSONObject(BSONObject); docSize = Int32(sizes!.popLast()!/* If nil, this is an internal error */)}
+		
+		/* Writing doc size to the doc (if size is skipped, set to 0) */
+		currentRelativeWritePosition += try write(value: &docSize, toStream: stream)
+		
+		/* Writing key values to the doc */
+		for (key, val) in BSONObject {
+			currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: &sizes, sizeFoundCallback: sizeFoundCallback)
 		}
-		currentWritePosition += try write(value: &zero, toStream: stream)
-		sizeFoundCallback(initialWritePosition, Int32(currentWritePosition - initialWritePosition))
-		return currentWritePosition
+		
+		/* Writing final 0 */
+		currentRelativeWritePosition += try write(value: &zero, toStream: stream)
+		
+		/* If skipping sizes, we have to call the callback for size found (the doc
+		 * is written entirely, we now know its size! */
+		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition - initialWritePosition))}
+		
+		/* The current write position is indeed the number of bytes written... */
+		return currentRelativeWritePosition
 	}
 	
-	class func sizesOfBSONObject(_ obj: BSONDoc) -> [Int]? {
+	class func sizesOfBSONObject(_ obj: BSONDoc) throws -> [Int] {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		precondition(MemoryLayout<Int>.size <= MemoryLayout<Int64>.size, "I currently need Int to be lower or equal in size than Int64")
 		
 		var curSize = 4 /* Size of the BSON Doc */
 		var sizes = [Int]()
 		for (key, val) in obj {
-			guard let sizesInfo = sizesForBSONEntity(val, withKey: key) else {return nil}
+			let sizesInfo = try sizesForBSONEntity(val, withKey: key)
 			sizes.insert(contentsOf: sizesInfo.1, at: 0)
 			curSize += sizesInfo.0
 		}
 		curSize += 1 /* The zero-terminator for BSON docs */
-		sizes.insert(curSize, at: 0)
+		sizes.append(curSize)
 		return sizes
 	}
 	
 	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
-		return sizesOfBSONObject(obj) != nil
+		return (try? sizesOfBSONObject(obj)) != nil
 	}
 	
-	private class func sizesForBSONEntity(_ entity: Any?, withKey key: String) -> (Int /* Size for whole entity with key */, [Int] /* Subsizes (often empty) */)? {
+	private class func sizesForBSONEntity(_ entity: Any?, withKey key: String) throws -> (Int /* Size for whole entity with key */, [Int] /* Subsizes (often empty) */) {
 		var subSizes = [Int]()
 		
 		var size = 1 /* Type of the element */
-		size += key.lengthOfBytes(using: .utf8) + 1 /* Size of the encoded key */
+		size += key.utf8.count + 1 /* Size of the encoded key */
 		
 		switch entity {
 		case nil: (/*nop; this value does not have anything to write*/)
@@ -561,19 +585,19 @@ class BSONSerialization {
 		case let str as String: size += sizeOfBSONEncodedString(str)
 			
 		case let subObj as BSONDoc:
-			guard let s = sizesOfBSONObject(subObj), let subObjSize = s.first else {return nil}
-			size += subObjSize
+			let s = try sizesOfBSONObject(subObj)
+			size += s.last!
 			subSizes = s
 			
 		case let array as [Any?]:
 			var arraySize = 4 /* The size of the BSON doc (an array is a BSON doc) */
-			for (i, elt) in array.enumerated() {
-				guard let sizesInfo = sizesForBSONEntity(elt, withKey: String(i)) else {return nil}
+			for (i, elt) in array.enumerated().reversed() {
+				let sizesInfo = try sizesForBSONEntity(elt, withKey: String(i))
 				subSizes.append(contentsOf: sizesInfo.1)
 				arraySize += sizesInfo.0
 			}
 			arraySize += 1 /* The zero terminator for a BSON doc */
-			subSizes.insert(arraySize, at: 0)
+			subSizes.append(arraySize)
 			size += arraySize
 			
 		case     _   as MongoTimestamp: size += 8
@@ -584,12 +608,12 @@ class BSONSerialization {
 		case let sjs as JavascriptWithScope:
 			var jsWithScopeSize = 4 /* Size of the whole jsWithScope entry */
 			jsWithScopeSize += sizeOfBSONEncodedString(sjs.javascript)
-			guard let s = sizesOfBSONObject(sjs.scope), let subObjSize = s.first else {return nil}
-			jsWithScopeSize += subObjSize
+			let s = try sizesOfBSONObject(sjs.scope)
+			jsWithScopeSize += s.last!
 			size += jsWithScopeSize
 			
 			subSizes = s
-			subSizes.insert(jsWithScopeSize, at: 0)
+			subSizes.append(jsWithScopeSize)
 			
 		case _ as MinKey: (/*nop; this value does not have anything to write*/)
 		case _ as MaxKey: (/*nop; this value does not have anything to write*/)
@@ -599,14 +623,172 @@ class BSONSerialization {
 			size += 12
 			
 		default:
-			return nil
+			throw BSONSerializationError.invalidBSONObject(invalidElement: entity! /* nil case already processed above */)
 		}
 		
 		return (size, subSizes)
 	}
 	
 	private class func sizeOfBSONEncodedString(_ str: String) -> Int {
-		return 4 /* length of the string is represented as an Int32 */ + str.lengthOfBytes(using: .utf8) + 1 /* The '\0' terminator */
+		return 4 /* length of the string is represented as an Int32 */ + str.utf8.count + 1 /* The '\0' terminator */
+	}
+	
+	/** Writes the given entity to the stream.
+	
+	- Note: The .skipSizes option is ignored (determined by whether the sizes
+	argument is `nil`.
+	
+	- Note: When possible, `sizeFoundCallback` should be optional (cannot be a
+	non-escaped closure in current Swift state). */
+	private class func write(BSONEntity entity: Any?, withKey key: String, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizes: inout [Int]?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
+		
+		var size = 0
+		
+		switch entity {
+		case nil:
+			size += try write(elementType: .null, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+		case let val as Bool:
+			size += try write(elementType: .boolean, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+			var bsonVal = Int8(val ? 1 : 0)
+			size += try write(value: &bsonVal, toStream: stream)
+			
+		case var val as Int32:
+			size += try write(elementType: .int32Bits, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
+			
+		case var val as Int64:
+			size += try write(elementType: .int64Bits, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
+			
+		case var val as Int where MemoryLayout<Int>.size == MemoryLayout<Int64>.size:
+			size += try write(elementType: .int64Bits, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
+			
+		case var val as Int where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
+			size += try write(elementType: .int32Bits, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
+			
+		case var val as Double:
+			size += try write(elementType: .double64Bits, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
+			
+		case var val as Double128:
+			size += try write(elementType: .double128Bits, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
+			
+		case let val as Date:
+			size += try write(elementType: .utcDateTime, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+			var timestamp = Int64(val.timeIntervalSince1970)
+			size += try write(value: &timestamp, toStream: stream)
+			
+//		case _ as NSRegularExpression: fatalError("Not Implemented (TODO)")
+			
+		case let str as String:
+			size += try write(elementType: .utf8String, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(BSONEncodedString: str, toStream: stream)
+			
+//		case let subObj as BSONDoc:
+//			guard let s = sizesOfBSONObject(subObj), let subObjSize = s.first else {return nil}
+//			size += subObjSize
+//			subSizes = s
+
+//		case let array as [Any?]:
+//			var arraySize = 4 /* The size of the BSON doc (an array is a BSON doc) */
+//			for (i, elt) in array.enumerated() {
+//				guard let sizesInfo = sizesForBSONEntity(elt, withKey: String(i)) else {return nil}
+//				subSizes.append(contentsOf: sizesInfo.1)
+//				arraySize += sizesInfo.0
+//			}
+//			arraySize += 1 /* The zero terminator for a BSON doc */
+//			subSizes.insert(arraySize, at: 0)
+//			size += arraySize
+//			
+//		case     _   as MongoTimestamp: size += 8
+//		case let bin as MongoBinary:    size += 4 /* Size of the data */ + 1 /* Binary subtype */ + bin.data.count
+//		case     _   as MongoObjectId:  size += 12
+			
+		case let js as Javascript:
+			size += try write(elementType: .javascript, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(BSONEncodedString: js.javascript, toStream: stream)
+			
+//		case let sjs as JavascriptWithScope:
+//			var jsWithScopeSize = 4 /* Size of the whole jsWithScope entry */
+//			jsWithScopeSize += sizeOfBSONEncodedString(sjs.javascript)
+//			guard let s = sizesOfBSONObject(sjs.scope), let subObjSize = s.first else {return nil}
+//			jsWithScopeSize += subObjSize
+//			size += jsWithScopeSize
+//			
+//			subSizes = s
+//			subSizes.insert(jsWithScopeSize, at: 0)
+			
+		case _ as MinKey:
+			size += try write(elementType: .minKey, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+		case _ as MaxKey:
+			size += try write(elementType: .maxKey, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+//		case let dbPointer as MongoDBPointer:
+//			size += sizeOfBSONEncodedString(dbPointer.stringPart)
+//			size += 12
+			
+		default:
+			throw BSONSerializationError.invalidBSONObject(invalidElement: entity! /* nil case already processed above */)
+		}
+		
+		return size
+	}
+	
+	private class func write(CEncodedString str: String, toStream stream: OutputStream) throws -> Int {
+		var written = 0
+		
+		/* Let's get the UTF8 bytes of the string. */
+		let bytes = [UInt8](str.utf8)
+		guard !bytes.contains(0) else {throw BSONSerializationError.unserializableKey(str)}
+		
+		let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+		guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+		written += curWrite
+		
+		var zero: Int8 = 0
+		written += try write(value: &zero, toStream: stream)
+		
+		return written
+	}
+	
+	private class func write(BSONEncodedString str: String, toStream stream: OutputStream) throws -> Int {
+		var written = 0
+		var strLength: Int32 = str.utf8.count + 1 /* The zero */
+		
+		/* Let's write the size of the string to the stream */
+		written += try write(value: &strLength, toStream: stream)
+		
+		/* Let's get the UTF8 bytes of the string. */
+		let bytes = [UInt8](str.utf8)
+		let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+		guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+		written += curWrite
+		
+		var zero: Int8 = 0
+		written += try write(value: &zero, toStream: stream)
+		
+		return written
 	}
 	
 	private class func write<T>(value: inout T, toStream stream: OutputStream) throws -> Int {
@@ -616,6 +798,11 @@ class BSONSerialization {
 			guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 			return size
 		}
+	}
+	
+	private class func write(elementType: BSONElementType, toStream stream: OutputStream) throws -> Int {
+		var t = elementType.rawValue
+		return try write(value: &t, toStream: stream)
 	}
 	
 }
