@@ -25,7 +25,7 @@ struct BSONWritingOptions : OptionSet {
 }
 
 
-class BSONSerialization {
+final class BSONSerialization {
 	
 	struct Double128/* : AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
 		
