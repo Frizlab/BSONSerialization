@@ -521,7 +521,7 @@ final class BSONSerialization {
 	
 	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
 	- Returns: The number of bytes written. */
-	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizes knownSizes: [Int]? = nil, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
 		let skipSizes = opt.contains(.skipSizes)
 		
 		var zero: Int8 = 0
@@ -530,8 +530,12 @@ final class BSONSerialization {
 		var docSize: Int32
 		var currentRelativeWritePosition = 0
 		
-		if skipSizes {sizes = nil;                               docSize = 0}
-		else         {sizes = try sizesOfBSONObject(BSONObject); docSize = Int32(sizes!.popLast()!/* If nil, this is an internal error */)}
+		if skipSizes {sizes = nil; docSize = 0}
+		else {
+			if let s = knownSizes {sizes = s}
+			else                  {sizes = try sizesOfBSONObject(BSONObject)}
+			docSize = Int32(sizes!.popLast()!/* If nil, this is an internal error */)
+		}
 		
 		/* Writing doc size to the doc (if size is skipped, set to 0) */
 		currentRelativeWritePosition += try write(value: &docSize, toStream: stream)
@@ -716,18 +720,24 @@ final class BSONSerialization {
 		case let subObj as BSONDoc:
 			size += try write(elementType: .dictionary, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
-			size += try write(BSONObject: subObj, toStream: stream, options: opt, initialWritePosition: initialWritePosition + size, sizeFoundCallback: sizeFoundCallback)
+			size += try write(BSONObject: subObj, toStream: stream, options: opt, initialWritePosition: initialWritePosition + size, sizes: sizes, sizeFoundCallback: sizeFoundCallback)
 			
-//		case let array as [Any?]:
-//			var arraySize = 4 /* The size of the BSON doc (an array is a BSON doc) */
-//			for (i, elt) in array.enumerated() {
-//				guard let sizesInfo = sizesForBSONEntity(elt, withKey: String(i)) else {return nil}
-//				subSizes.append(contentsOf: sizesInfo.1)
-//				arraySize += sizesInfo.0
-//			}
-//			arraySize += 1 /* The zero terminator for a BSON doc */
-//			subSizes.insert(arraySize, at: 0)
-//			size += arraySize
+		case let array as [Any?]:
+			size += try write(elementType: .array, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			let arrayStart = initialWritePosition + size
+			
+			var arraySize: Int32
+			var computedArraySize = 0
+			if sizes != nil {arraySize = Int32(sizes!.popLast()!)}
+			else            {arraySize = 0}
+			computedArraySize += try write(value: &arraySize, toStream: stream)
+			for (i, elt) in array.enumerated() {
+				computedArraySize += try write(BSONEntity: elt, withKey: String(i), toStream: stream, options: opt, initialWritePosition: arrayStart + computedArraySize, sizes: &sizes, sizeFoundCallback: sizeFoundCallback)
+			}
+			
+			if sizes == nil {sizeFoundCallback(arrayStart, Int32(computedArraySize))}
+			size += computedArraySize
 			
 		case let val as MongoTimestamp:
 			size += try write(elementType: .timestamp, toStream: stream)
@@ -761,15 +771,21 @@ final class BSONSerialization {
 			size += try write(CEncodedString: key, toStream: stream)
 			size += try write(BSONEncodedString: js.javascript, toStream: stream)
 			
-//		case let sjs as JavascriptWithScope:
-//			var jsWithScopeSize = 4 /* Size of the whole jsWithScope entry */
-//			jsWithScopeSize += sizeOfBSONEncodedString(sjs.javascript)
-//			guard let s = sizesOfBSONObject(sjs.scope), let subObjSize = s.first else {return nil}
-//			jsWithScopeSize += subObjSize
-//			size += jsWithScopeSize
-//			
-//			subSizes = s
-//			subSizes.insert(jsWithScopeSize, at: 0)
+		case let sjs as JavascriptWithScope:
+			size += try write(elementType: .javascriptWithScope, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			let sjsStart = initialWritePosition + size
+			
+			var sjsSize: Int32
+			var computedSJSSize = 0
+			if sizes != nil {sjsSize = Int32(sizes!.popLast()!)}
+			else            {sjsSize = 0}
+			computedSJSSize += try write(value: &sjsSize, toStream: stream)
+			computedSJSSize += try write(BSONEncodedString: sjs.javascript, toStream: stream)
+			computedSJSSize += try write(BSONObject: sjs.scope, toStream: stream, options: opt, initialWritePosition: sjsStart + computedSJSSize, sizeFoundCallback: sizeFoundCallback)
+			
+			if sizes == nil {sizeFoundCallback(sjsStart, Int32(computedSJSSize))}
+			size += computedSJSSize
 			
 		case _ as MinKey:
 			size += try write(elementType: .minKey, toStream: stream)
