@@ -717,9 +717,32 @@ final class BSONSerialization {
 //			subSizes.insert(arraySize, at: 0)
 //			size += arraySize
 			
-//		case     _   as MongoTimestamp: size += 8
-//		case let bin as MongoBinary:    size += 4 /* Size of the data */ + 1 /* Binary subtype */ + bin.data.count
-//		case     _   as MongoObjectId:  size += 12
+		case let val as MongoTimestamp:
+			size += try write(elementType: .timestamp, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+			var subVal: (UInt8, UInt8, UInt8, UInt8)
+			subVal = val.increment; size += try write(value: &subVal, toStream: stream)
+			subVal = val.timestamp; size += try write(value: &subVal, toStream: stream)
+			
+		case let bin as MongoBinary:
+			size += try write(elementType: .timestamp, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			
+			var size: Int32 = Int32(bin.data.count)
+			size += try write(value: &size, toStream: stream)
+			
+			var type = bin.binaryTypeAsInt
+			size += try write(value: &type, toStream: stream)
+			
+			let written = bin.data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in return stream.write(bytes, maxLength: bin.data.count) }
+			guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+			size += written
+			
+		case var val as MongoObjectId:
+			size += try write(elementType: .objectId, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(value: &val, toStream: stream)
 			
 		case let js as Javascript:
 			size += try write(elementType: .javascript, toStream: stream)
@@ -744,9 +767,12 @@ final class BSONSerialization {
 			size += try write(elementType: .maxKey, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
 			
-//		case let dbPointer as MongoDBPointer:
-//			size += sizeOfBSONEncodedString(dbPointer.stringPart)
-//			size += 12
+		case let dbPointer as MongoDBPointer:
+			var bytes = dbPointer.bytesPart
+			size += try write(elementType: .dbPointer, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(BSONEncodedString: dbPointer.stringPart, toStream: stream)
+			size += try write(value: &bytes, toStream: stream)
 			
 		default:
 			throw BSONSerializationError.invalidBSONObject(invalidElement: entity! /* nil case already processed above */)
