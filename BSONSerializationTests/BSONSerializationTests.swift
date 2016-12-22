@@ -234,7 +234,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = [:]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -245,7 +245,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["": "def"]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -256,7 +256,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["abc": ""]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -267,7 +267,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["": ""]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -278,7 +278,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["abc": "def"]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -289,7 +289,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["abc": "def", "ghi": "jkl"]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -300,7 +300,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": nil]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -311,7 +311,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": true]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -322,7 +322,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": 42]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -333,7 +333,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": Int32(42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -344,7 +344,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": Int64(42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -355,7 +355,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": Double(42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -366,7 +366,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": Double128(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) /* No idea if this is a valid Double128... */)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -377,7 +377,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": Date()]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -388,7 +388,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": try! NSRegularExpression(pattern: ".*", options: [])]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -399,7 +399,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": ["abc": "def"]]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -410,7 +410,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": ["abc", "def"]]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -421,7 +421,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": MongoTimestamp(incrementData: Data([0, 1, 2, 3]), timestampData: Data([4, 5, 6, 7]))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -432,7 +432,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": MongoBinary(binaryTypeAsInt: MongoBinary.BinarySubtype.genericBinary.rawValue, data: Data([0, 1, 2, 3, 4, 5]))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -443,7 +443,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": MongoObjectId(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -454,7 +454,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": Javascript(javascript: "console.log(\"hello world\");" /* Not sure if valid JS, but we do not care... */)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -465,7 +465,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": JavascriptWithScope(javascript: "console.log(\"hello world\");", scope: ["abc": "def"])]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -476,7 +476,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": MinKey()]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -487,7 +487,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": MaxKey()]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -498,7 +498,7 @@ class BSONSerializationTests: XCTestCase {
 			let ref: BSONDoc = ["key": MongoDBPointer(stringPart: "StringPart!", bytesPartData: Data([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
-			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
 		}
