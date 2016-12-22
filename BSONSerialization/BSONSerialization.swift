@@ -484,7 +484,15 @@ final class BSONSerialization {
 		switch entity {
 		case nil: (/*nop; this value does not have anything to write*/)
 		case _ as Bool:                        size += 1
-		case _ as Int32, _ as Int64, _ as Int: size += MemoryLayout.size(ofValue: entity!)
+			
+		case _ as Int32: fallthrough
+		case _ as Int where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
+			size += MemoryLayout<Int32>.size
+			
+		case _ as Int64: fallthrough
+		case _ as Int where MemoryLayout<Int>.size == MemoryLayout<Int64>.size:
+			size += MemoryLayout<Int64>.size
+			
 		case _ as Double:                      size += 8  /* 64  bits is 8  bytes */
 		case _ as Double128:                   size += 16 /* 128 bits is 16 bytes */
 		case _ as Date:                        size += 8  /* Encoded as an Int64 */
