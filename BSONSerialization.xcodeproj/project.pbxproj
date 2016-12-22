@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		7B1120571DF4708B0048AE37 /* BufferStream.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1120561DF4708B0048AE37 /* BufferStream.swift */; };
+		7B1929381E0C964800DC3848 /* BSONClasses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B1929371E0C964800DC3848 /* BSONClasses.swift */; };
 		7B2FA1B61E06997300087805 /* BufferedInputStreamTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */; };
 		7B2FA1B81E069E7500087805 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B2FA1B71E069E7500087805 /* TestHelpers.swift */; };
 		7BC105811C4C425C004CFB30 /* BSONSerialization.h in Headers */ = {isa = PBXBuildFile; fileRef = 7BC105801C4C425C004CFB30 /* BSONSerialization.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -28,6 +29,7 @@
 
 /* Begin PBXFileReference section */
 		7B1120561DF4708B0048AE37 /* BufferStream.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferStream.swift; sourceTree = "<group>"; };
+		7B1929371E0C964800DC3848 /* BSONClasses.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BSONClasses.swift; sourceTree = "<group>"; };
 		7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferedInputStreamTests.swift; sourceTree = "<group>"; };
 		7B2FA1B71E069E7500087805 /* TestHelpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BSONSerialization.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -85,6 +87,7 @@
 			children = (
 				7BC105801C4C425C004CFB30 /* BSONSerialization.h */,
 				7B1120561DF4708B0048AE37 /* BufferStream.swift */,
+				7B1929371E0C964800DC3848 /* BSONClasses.swift */,
 				7BC105971C4C49AB004CFB30 /* BSONSerialization.swift */,
 				7BC105821C4C425C004CFB30 /* Info.plist */,
 			);
@@ -212,6 +215,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7B1929381E0C964800DC3848 /* BSONClasses.swift in Sources */,
 				7BC105981C4C49AB004CFB30 /* BSONSerialization.swift in Sources */,
 				7B1120571DF4708B0048AE37 /* BufferStream.swift in Sources */,
 			);

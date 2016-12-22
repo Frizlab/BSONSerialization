@@ -27,112 +27,6 @@ struct BSONWritingOptions : OptionSet {
 
 final class BSONSerialization {
 	
-	struct Double128/* : AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
-		
-		let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-		
-	}
-	
-	struct MongoTimestamp {
-		
-		let increment: (UInt8, UInt8, UInt8, UInt8)
-		let timestamp: (UInt8, UInt8, UInt8, UInt8)
-		
-		init(incrementData: Data, timestampData: Data) {
-			assert(incrementData.count == 4)
-			assert(timestampData.count == 4)
-			increment = (incrementData[0], incrementData[1], incrementData[2], incrementData[3])
-			timestamp = (timestampData[0], timestampData[1], timestampData[2], timestampData[3])
-		}
-		
-	}
-	
-	struct MongoBinary {
-		
-		enum BinarySubtype : UInt8 {
-			case genericBinary = 0x00
-			case function      = 0x01
-			case uuid          = 0x04
-			case md5           = 0x05
-			
-			/* Start of user-defined subtypes (up to 0xFF). */
-			case userDefined   = 0x80
-			
-			case uuidOld       = 0x03
-			case binaryOld     = 0x02
-		}
-		
-		let binaryTypeAsInt: UInt8
-		let data: Data
-		
-		var binaryType: BinarySubtype? {
-			if let t = BinarySubtype(rawValue: binaryTypeAsInt) {return t}
-			if binaryTypeAsInt >= BinarySubtype.userDefined.rawValue {return BinarySubtype.userDefined}
-			return nil
-		}
-		
-	}
-	
-	struct MongoObjectId {
-		
-		let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-		
-	}
-	
-	struct Javascript {
-		
-		let javascript: String
-		
-	}
-	
-	struct JavascriptWithScope {
-		
-		let javascript: String
-		let scope: BSONDoc
-		
-	}
-	
-	struct MinKey : Comparable {
-		
-		static func ==(lhs: MinKey, rhs: MinKey) -> Bool {return true}
-		static func ==(lhs: MinKey, rhs: Any?) -> Bool {return false}
-		static func ==(lhs: Any?, rhs: MinKey) -> Bool {return false}
-		
-		static func <(lhs: MinKey, rhs: MinKey) -> Bool {return false}
-		static func <(lhs: MinKey, rhs: Any?) -> Bool {return true}
-		static func <(lhs: Any?, rhs: MinKey) -> Bool {return false}
-		
-	}
-	
-	struct MaxKey : Comparable {
-		
-		static func ==(lhs: MaxKey, rhs: MaxKey) -> Bool {return true}
-		static func ==(lhs: MaxKey, rhs: Any?) -> Bool {return false}
-		static func ==(lhs: Any?, rhs: MaxKey) -> Bool {return false}
-		
-		static func <(lhs: MaxKey, rhs: MaxKey) -> Bool {return false}
-		static func <(lhs: MaxKey, rhs: Any?) -> Bool {return false}
-		static func <(lhs: Any?, rhs: MaxKey) -> Bool {return true}
-		
-	}
-	
-	struct MongoDBPointer {
-		
-		let stringPart: String
-		let bytesPart: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-		
-		init(stringPart str: String, bytesPartData: Data) {
-			assert(bytesPartData.count == 12)
-			stringPart = str
-			bytesPart = (
-				bytesPartData[0],  bytesPartData[1],  bytesPartData[2],  bytesPartData[3],
-				bytesPartData[4],  bytesPartData[5],  bytesPartData[6],  bytesPartData[7],
-				bytesPartData[8],  bytesPartData[9],  bytesPartData[10], bytesPartData[11]
-			)
-		}
-		
-	}
-	
 	/** The BSON Serialization errors enum. */
 	enum BSONSerializationError : Error {
 		/** The given data/stream contains too few bytes to be a valid bson doc. */
@@ -205,81 +99,12 @@ final class BSONSerialization {
 		case internalError
 	}
 	
-	/** The recognized BSON element types. */
-	private enum BSONElementType : UInt8 {
-		/** The end of the document. Parsing ends when this element is found. */
-		case endOfDocument       = 0x00
-		
-		/** `nil` */
-		case null                = 0x0A
-		/** `Bool`. Raw value is a single byte, containing `'\0'` (`false`) or
-		`'\1'` (`true`). */
-		case boolean             = 0x08
-		/** `Int32`. 4 bytes (32-bit signed integer, two’s complement). */
-		case int32Bits           = 0x10
-		/** `Int64`. 8 bytes (64-bit signed integer, two’s complement). */
-		case int64Bits           = 0x12
-		/** `Double`. 8 bytes (64-bit IEEE 754-2008 binary floating point). */
-		case double64Bits        = 0x01
-		/** `.Double128`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
-		Currently Double128 is a struct containing a Data of length 16 bytes. */
-		case double128Bits       = 0x13
-		/** `Date`. Raw value is the number of milliseconds since the Epoch in UTC
-		in an Int64. */
-		case utcDateTime         = 0x09
-		/** `NSRegularExpression`. Raw value is two cstring: Regexp pattern first,
-		then regexp options. */
-		case regularExpression   = 0x0B
-		
-		/** `String`. Raw value is an Int32 representing the length of the string
-		+ 1, then the actual bytes of the string, then a single 0 byte. */
-		case utf8String          = 0x02
-		
-		/** `BSONDoc`. Raw value is an embedded BSON document */
-		case dictionary          = 0x03
-		/** `[Any?]`. Raw value is an embedded BSON document; keys are "0", "1",
-		etc. and must be ordered in numerical order. */
-		case array               = 0x04
-		
-		/** `.MongoTimestamp`. Special internal type used by MongoDB replication
-		and sharding. First 4 bytes are an increment, second 4 are a timestamp. */
-		case timestamp           = 0x11
-		/** `.MongoBinary`. Raw value is an Int32, followed by a subtype (1 byte)
-		then the actual bytes. */
-		case binary              = 0x05
-		/** `.MongoObjectId`. 12 bytes, used by MongoDB. */
-		case objectId            = 0x07
-		/** `Javascript`. (Basically a container for a `String`.) */
-		case javascript          = 0x0D
-		/**
-		`.JavascriptWithScope`. Raw value is an Int32 representing the length of
-		the whole raw value, then a string, then an embedded BSON doc.
-		
-		The document is a mapping from identifiers to values, representing the
-		scope in which the string should be evaluated.*/
-		case javascriptWithScope = 0x0F
-		
-		/** `.MinKey` Special type which compares lower than all other possible
-		BSON element values. */
-		case minKey              = 0xFF
-		/** `.MaxKey` Special type which compares higher than all other possible
-		BSON element values. */
-		case maxKey              = 0x7F
-		
-		/** `nil`. Undefined value. Deprecated. */
-		case undefined           = 0x06
-		/** `.MongoDBPointer`. Deprecated. Raw value is a string followed by 12
-		bytes. */
-		case dbPointer           = 0x0C
-		/** Value is `String`. Deprecated. */
-		case symbol              = 0x0E
-	}
-	
 	/**
 	Serialize the given data into a dictionary with String keys, object values.
 	
 	- Parameter data: The data to parse. Must be exactly an entire BSON doc.
-	- Parameter options: Some options to customize the parsing. See `BSONReadingOptions`.
+	- Parameter options: Some options to customize the parsing. See
+	`BSONReadingOptions`.
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
@@ -574,6 +399,80 @@ final class BSONSerialization {
 	
 	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
 		return (try? sizesOfBSONObject(obj)) != nil
+	}
+	
+	/* ***************
+	   MARK: - Private
+	   *************** */
+	
+	/** The recognized BSON element types. */
+	private enum BSONElementType : UInt8 {
+		/** The end of the document. Parsing ends when this element is found. */
+		case endOfDocument       = 0x00
+		
+		/** `nil` */
+		case null                = 0x0A
+		/** `Bool`. Raw value is a single byte, containing `'\0'` (`false`) or
+		`'\1'` (`true`). */
+		case boolean             = 0x08
+		/** `Int32`. 4 bytes (32-bit signed integer, two’s complement). */
+		case int32Bits           = 0x10
+		/** `Int64`. 8 bytes (64-bit signed integer, two’s complement). */
+		case int64Bits           = 0x12
+		/** `Double`. 8 bytes (64-bit IEEE 754-2008 binary floating point). */
+		case double64Bits        = 0x01
+		/** `.Double128`. 16 bytes (128-bit IEEE 754-2008 decimal floating point).
+		Currently Double128 is a struct containing a Data of length 16 bytes. */
+		case double128Bits       = 0x13
+		/** `Date`. Raw value is the number of milliseconds since the Epoch in UTC
+		in an Int64. */
+		case utcDateTime         = 0x09
+		/** `NSRegularExpression`. Raw value is two cstring: Regexp pattern first,
+		then regexp options. */
+		case regularExpression   = 0x0B
+		
+		/** `String`. Raw value is an Int32 representing the length of the string
+		+ 1, then the actual bytes of the string, then a single 0 byte. */
+		case utf8String          = 0x02
+		
+		/** `BSONDoc`. Raw value is an embedded BSON document */
+		case dictionary          = 0x03
+		/** `[Any?]`. Raw value is an embedded BSON document; keys are "0", "1",
+		etc. and must be ordered in numerical order. */
+		case array               = 0x04
+		
+		/** `.MongoTimestamp`. Special internal type used by MongoDB replication
+		and sharding. First 4 bytes are an increment, second 4 are a timestamp. */
+		case timestamp           = 0x11
+		/** `.MongoBinary`. Raw value is an Int32, followed by a subtype (1 byte)
+		then the actual bytes. */
+		case binary              = 0x05
+		/** `.MongoObjectId`. 12 bytes, used by MongoDB. */
+		case objectId            = 0x07
+		/** `Javascript`. (Basically a container for a `String`.) */
+		case javascript          = 0x0D
+		/**
+		`.JavascriptWithScope`. Raw value is an Int32 representing the length of
+		the whole raw value, then a string, then an embedded BSON doc.
+		
+		The document is a mapping from identifiers to values, representing the
+		scope in which the string should be evaluated.*/
+		case javascriptWithScope = 0x0F
+		
+		/** `.MinKey` Special type which compares lower than all other possible
+		BSON element values. */
+		case minKey              = 0xFF
+		/** `.MaxKey` Special type which compares higher than all other possible
+		BSON element values. */
+		case maxKey              = 0x7F
+		
+		/** `nil`. Undefined value. Deprecated. */
+		case undefined           = 0x06
+		/** `.MongoDBPointer`. Deprecated. Raw value is a string followed by 12
+		bytes. */
+		case dbPointer           = 0x0C
+		/** Value is `String`. Deprecated. */
+		case symbol              = 0x0E
 	}
 	
 	private class func sizesForBSONEntity(_ entity: Any?, withKey key: String) throws -> (Int /* Size for whole entity with key */, [Int] /* Subsizes (often empty) */) {
@@ -890,7 +789,9 @@ final class BSONSerialization {
 	
 }
 
-
+/* *******
+   MARK: -
+   ******* */
 
 private extension BufferStream {
 	
