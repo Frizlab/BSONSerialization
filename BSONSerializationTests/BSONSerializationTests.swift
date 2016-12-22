@@ -187,7 +187,7 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
-	func testEncodeEmptySimpleBSONToData() {
+	func testEncodeSimpleBSONToData() {
 		do {
 			let ref = "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00"
 			let res = try BSONSerialization.data(withBSONObject: ["abc": "def"], options: []).hexEncodedString()
@@ -197,7 +197,7 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
-	func testEncodeEmptySimpleEmbeddedBSONToData() {
+	func testEncodeSimpleEmbeddedBSONToData() {
 		do {
 			let ref = "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00"
 			let res = try BSONSerialization.data(withBSONObject: ["doc": ["abc": "def"]], options: []).hexEncodedString()
@@ -218,11 +218,287 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
-	func testEncodeEmptySimpleEmbeddedBSONToStream() {
+	func testEncodeSimpleEmbeddedBSONToStream() {
 		do {
 			let ref = "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00"
 			let res = try dataFromWriteStream { _ = try BSONSerialization.write(BSONObject: ["doc": ["abc": "def"]], toStream: $0, options: []) }.hexEncodedString()
 			XCTAssertEqual(res, ref)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	
+	func testEncodeDecodeEmptyBSONUsingData() {
+		do {
+			let ref: BSONDoc = [:]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleOneEmptyKeyBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["": "def"]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleOneEmptyValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["abc": ""]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleOneEmptyKeyAndValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["": ""]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleOneKeyBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["abc": "def"]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleTwoKeysBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["abc": "def", "ghi": "jkl"]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleNilValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": nil]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleBoolValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": true]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleIntValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": 42]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleInt32ValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": Int32(42)]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleInt64ValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": Int64(42)]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleDouble64ValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": Double(42)]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleDouble128ValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.Double128(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) /* No idea if this is a valid Double128... */)]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleDateValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": Date()]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleRegexValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": try! NSRegularExpression(pattern: ".*", options: [])]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleEmbeddedDocValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": ["abc": "def"]]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleArrayValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": ["abc", "def"]]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleBSONTimeStampValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.MongoTimestamp(incrementData: Data([0, 1, 2, 3]), timestampData: Data([4, 5, 6, 7]))]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleBSONBinaryValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.MongoBinary(binaryTypeAsInt: BSONSerialization.MongoBinary.BinarySubtype.genericBinary.rawValue, data: Data([0, 1, 2, 3, 4, 5]))]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleBSONObjectIdValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.MongoObjectId(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleJSValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.Javascript(javascript: "console.log(\"hello world\");" /* Not sure if valid JS, but we do not care... */)]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleJSWithScopeValSimpleScopeBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.JavascriptWithScope(javascript: "console.log(\"hello world\");", scope: ["abc": "def"])]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleMinKeyValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.MinKey()]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleMaxKeyValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.MaxKey()]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeSimpleMongoDBPointerKeyValBSONUsingData() {
+		do {
+			let ref: BSONDoc = ["key": BSONSerialization.MongoDBPointer(stringPart: "StringPart!", bytesPartData: Data([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))]
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssertEqual(decoded as NSDictionary, ref as NSDictionary)
 		} catch {
 			XCTFail("\(error)")
 		}
