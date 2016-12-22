@@ -189,9 +189,15 @@ final class BSONSerialization {
 		/** An invalid BSON object was given to be serialized. The invalid element
 		is passed in argument to this error. */
 		case invalidBSONObject(invalidElement: Any)
-		/** One of the key cannot be serialized in an unambiguous way. Said key is
-		given in arg of the error. */
-		case unserializableKey(String)
+		/**
+		Tried to serialize an unserializable string (using the C
+		representation). This is due to the fact that the '\0' char can be used in
+		a valid UTF8 string. (Note: the characters '\254' and '\255' can NEVER be
+		used in a valid UTF8 string. Why were they not the separator?)
+		
+		Usually, the BSON strings represented using the C representation are
+		dictionary keys. But they can also be the components of a regexp. */
+		case unserializableCString(String)
 		
 		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
 		case cannotAllocateMemory(Int)
@@ -580,7 +586,9 @@ final class BSONSerialization {
 		case _ as Double128:                   size += 16 /* 128 bits is 16 bytes */
 		case _ as Date:                        size += 8  /* Encoded as an Int64 */
 			
-		case _ as NSRegularExpression: fatalError("Not Implemented (TODO)")
+		case let regexp as NSRegularExpression:
+			size += regexp.pattern.utf8.count + 1
+			size += bsonRegexpOptionsString(fromFoundationRegexp: regexp).utf8.count + 1
 			
 		case let str as String: size += sizeOfBSONEncodedString(str)
 			
@@ -694,7 +702,11 @@ final class BSONSerialization {
 			var timestamp = Int64(val.timeIntervalSince1970)
 			size += try write(value: &timestamp, toStream: stream)
 			
-//		case _ as NSRegularExpression: fatalError("Not Implemented (TODO)")
+		case let regexp as NSRegularExpression:
+			size += try write(elementType: .utcDateTime, toStream: stream)
+			size += try write(CEncodedString: key, toStream: stream)
+			size += try write(CEncodedString: regexp.pattern, toStream: stream)
+			size += try write(CEncodedString: bsonRegexpOptionsString(fromFoundationRegexp: regexp), toStream: stream)
 			
 		case let str as String:
 			size += try write(elementType: .utf8String, toStream: stream)
@@ -786,7 +798,7 @@ final class BSONSerialization {
 		
 		/* Let's get the UTF8 bytes of the string. */
 		let bytes = [UInt8](str.utf8)
-		guard !bytes.contains(0) else {throw BSONSerializationError.unserializableKey(str)}
+		guard !bytes.contains(0) else {throw BSONSerializationError.unserializableCString(str)}
 		
 		let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
 		guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
@@ -829,6 +841,21 @@ final class BSONSerialization {
 	private class func write(elementType: BSONElementType, toStream stream: OutputStream) throws -> Int {
 		var t = elementType.rawValue
 		return try write(value: &t, toStream: stream)
+	}
+	
+	private class func bsonRegexpOptionsString(fromFoundationRegexp foundationRegexp: NSRegularExpression) -> String {
+		var result = ""
+		
+		let opt = foundationRegexp.options
+		if  opt.contains(.caseInsensitive)          {result += "i" /* Case insensitive matching */}
+		if !opt.contains(.anchorsMatchLines)        {result += "m" /* Multiline matching. Not sure if what we've set corresponds exactly to the MongoDB implementation's... */}
+		/* Unsupported in foundation flag: x (verbose) */
+		result += "l" /* We consider this flag to be a default, unremovable behaviour in Foundation (makes \w, \W, etc. locale dependent) */
+		if  opt.contains(.dotMatchesLineSeparators) {result += "s" /* Dotall mode ('.' matches everything). Not sure if exactly equivalent to Foundation option... */}
+		if  opt.contains(.useUnicodeWordBoundaries) {result += "u" /* Make \w, \W, etc. match unicode */}
+		/* Ignored foundation options: .allowCommentsAndWhitespace, .ignoreMetacharacters, .useUnixLineSeparators */
+		
+		return result
 	}
 	
 }
