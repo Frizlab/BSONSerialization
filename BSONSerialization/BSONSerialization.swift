@@ -322,7 +322,7 @@ final class BSONSerialization {
 		else                                                              {previousStreamReadSizeLimit = nil}
 		defer {if let bufferedInputStream = bufferStream as? BufferedInputStream {bufferedInputStream.streamReadSizeLimit = previousStreamReadSizeLimit}}
 		
-		var ret = [String: Any]()
+		var ret = [String: Any?]()
 		
 		var isAtEnd = false
 		while !isAtEnd {
@@ -338,7 +338,7 @@ final class BSONSerialization {
 			switch BSONElementType(rawValue: currentElementType) {
 			case .null?:
 				try decodeCallback(key, nil)
-				ret[key] = nil
+				ret.updateValue(nil, forKey: key) /* Cannot use ret[key] = nil because this has for effect to remove the value for the given key. */
 				
 			case .boolean?:
 				let valAsInt8 = try bufferStream.readData(size: 1, alwaysCopyBytes: false).first!
