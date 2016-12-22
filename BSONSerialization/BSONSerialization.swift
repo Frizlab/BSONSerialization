@@ -707,7 +707,7 @@ final class BSONSerialization {
 			size += try write(value: &timestamp, toStream: stream)
 			
 		case let regexp as NSRegularExpression:
-			size += try write(elementType: .utcDateTime, toStream: stream)
+			size += try write(elementType: .regularExpression, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
 			size += try write(CEncodedString: regexp.pattern, toStream: stream)
 			size += try write(CEncodedString: bsonRegexpOptionsString(fromFoundationRegexp: regexp), toStream: stream)
@@ -736,6 +736,9 @@ final class BSONSerialization {
 				computedArraySize += try write(BSONEntity: elt, withKey: String(i), toStream: stream, options: opt, initialWritePosition: arrayStart + computedArraySize, sizes: &sizes, sizeFoundCallback: sizeFoundCallback)
 			}
 			
+			var zero: Int8 = 0
+			computedArraySize += try write(value: &zero, toStream: stream)
+			
 			if sizes == nil {sizeFoundCallback(arrayStart, Int32(computedArraySize))}
 			size += computedArraySize
 			
@@ -748,18 +751,21 @@ final class BSONSerialization {
 			subVal = val.timestamp; size += try write(value: &subVal, toStream: stream)
 			
 		case let bin as MongoBinary:
-			size += try write(elementType: .timestamp, toStream: stream)
+			size += try write(elementType: .binary, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
 			
-			var size: Int32 = Int32(bin.data.count)
-			size += try write(value: &size, toStream: stream)
+			var dataSize: Int32 = Int32(bin.data.count)
+			size += try write(value: &dataSize, toStream: stream)
 			
 			var type = bin.binaryTypeAsInt
 			size += try write(value: &type, toStream: stream)
 			
-			let written = bin.data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in return stream.write(bytes, maxLength: bin.data.count) }
-			guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-			size += written
+			/* Writing a 0-length data seems to make next writes to the stream fail */
+			if bin.data.count > 0 {
+				let written = bin.data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in return stream.write(bytes, maxLength: bin.data.count) }
+				guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+				size += written
+			}
 			
 		case var val as MongoObjectId:
 			size += try write(elementType: .objectId, toStream: stream)
@@ -812,13 +818,16 @@ final class BSONSerialization {
 	private class func write(CEncodedString str: String, toStream stream: OutputStream) throws -> Int {
 		var written = 0
 		
-		/* Let's get the UTF8 bytes of the string. */
-		let bytes = [UInt8](str.utf8)
-		guard !bytes.contains(0) else {throw BSONSerializationError.unserializableCString(str)}
-		
-		let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
-		guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-		written += curWrite
+		/* Apparently writing 0 bytes to the stream will f**ck it up... */
+		if str.characters.count > 0 {
+			/* Let's get the UTF8 bytes of the string. */
+			let bytes = [UInt8](str.utf8)
+			guard !bytes.contains(0) else {throw BSONSerializationError.unserializableCString(str)}
+			
+			let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+			written += curWrite
+		}
 		
 		var zero: Int8 = 0
 		written += try write(value: &zero, toStream: stream)
@@ -833,11 +842,14 @@ final class BSONSerialization {
 		/* Let's write the size of the string to the stream */
 		written += try write(value: &strLength, toStream: stream)
 		
-		/* Let's get the UTF8 bytes of the string. */
-		let bytes = [UInt8](str.utf8)
-		let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
-		guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-		written += curWrite
+		/* Apparently writing 0 bytes to the stream will f**ck it up... */
+		if str.characters.count > 0 {
+			/* Let's get the UTF8 bytes of the string. */
+			let bytes = [UInt8](str.utf8)
+			let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+			written += curWrite
+		}
 		
 		var zero: Int8 = 0
 		written += try write(value: &zero, toStream: stream)
@@ -848,6 +860,8 @@ final class BSONSerialization {
 	private class func write<T>(value: inout T, toStream stream: OutputStream) throws -> Int {
 		return try withUnsafePointer(to: &value) { pointer -> Int in
 			let size = MemoryLayout<T>.size
+			guard size > 0 else {return 0} /* Less than probable that size is equal to zero... */
+			
 			let writtenSize = stream.write(unsafeBitCast(pointer, to: UnsafePointer<UInt8>.self), maxLength: size)
 			guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 			return size
