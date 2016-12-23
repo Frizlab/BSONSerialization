@@ -295,7 +295,7 @@ final class BSONSerialization {
 				
 			case .undefined?:
 				try decodeCallback(key, nil)
-				ret[key] = nil
+				ret[key] = .some(nil)
 				
 			case .dbPointer?:
 				let stringPart = try bufferStream.readBSONString(encoding: .utf8)
