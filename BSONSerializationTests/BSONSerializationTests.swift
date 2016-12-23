@@ -504,6 +504,18 @@ class BSONSerializationTests: XCTestCase {
 		}
 	}
 	
+	func testEncodeDecodeManyEmbeddedBSONUsingData() {
+		do {
+			var ref: BSONDoc = [:]
+			for i in 0..<500 {ref[String(i)] = ["subkey!": String(repeating: ".", count: i)]}
+			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
 	
 	func testEncodeDecodeEmptyBSONUsingStream() {
 		do {
@@ -772,6 +784,40 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleMongoDBPointerKeyValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MongoDBPointer(stringPart: "StringPart!", bytesPartData: Data([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))]
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeOneEmbeddedBSONUsingStream() {
+		do {
+			let ref: BSONDoc = ["1": ["subkey!": "."]]
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeTwoEmbeddedBSONUsingStream() {
+		do {
+			let ref: BSONDoc = ["1": ["subkey!": "."], "2": ["subkey!": ".."]]
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
+			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testEncodeDecodeManyEmbeddedBSONUsingStream() {
+		do {
+			var ref: BSONDoc = [:]
+			for i in 0..<500 {ref[String(i)] = ["subkey!": String(repeating: ".", count: i)]}
 			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)

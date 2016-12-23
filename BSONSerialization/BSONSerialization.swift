@@ -327,7 +327,7 @@ final class BSONSerialization {
 		defer {CFWriteStreamClose(stream)}
 		
 		var sizes = [Int: Int32]()
-		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt.union([.skipSizes]), sizeFoundCallback: { offset, size in
+		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt.union(.skipSizes), sizeFoundCallback: { offset, size in
 			assert(sizes[offset] == nil)
 			sizes[offset] = size
 		})
@@ -351,28 +351,44 @@ final class BSONSerialization {
 	
 	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
 	- Returns: The number of bytes written. */
-	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizes knownSizes: [Int]? = nil, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizes knownSizes: UnsafeMutablePointer<[Int]>? = nil, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
 		let skipSizes = opt.contains(.skipSizes)
 		
 		var zero: Int8 = 0
 		
-		var sizes: [Int]?
 		var docSize: Int32
+		let allocatedPointer: Bool
 		var currentRelativeWritePosition = 0
+		let sizesPointer: UnsafeMutablePointer<[Int]>?
 		
-		if skipSizes {sizes = nil; docSize = 0}
+		if skipSizes {allocatedPointer = false; sizesPointer = nil; docSize = 0}
 		else {
-			if let s = knownSizes {sizes = s}
-			else                  {sizes = try sizesOfBSONObject(BSONObject)}
-			docSize = Int32(sizes!.popLast()!/* If nil, this is an internal error */)
+			let nonNilSizesPointer: UnsafeMutablePointer<[Int]>
+			if let s = knownSizes {
+				allocatedPointer = false
+				nonNilSizesPointer = s
+			} else {
+				allocatedPointer = true
+				nonNilSizesPointer = UnsafeMutablePointer<[Int]>.allocate(capacity: 1)
+				nonNilSizesPointer.initialize(to: try sizesOfBSONObject(BSONObject), count: 1)
+			}
+			docSize = Int32(nonNilSizesPointer.pointee.popLast()!/* If nil, this is an internal error */)
+			sizesPointer = nonNilSizesPointer
 		}
 		
 		/* Writing doc size to the doc (if size is skipped, set to 0) */
 		currentRelativeWritePosition += try write(value: &docSize, toStream: stream)
 		
 		/* Writing key values to the doc */
-		for (key, val) in BSONObject {
-			currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: &sizes, sizeFoundCallback: sizeFoundCallback)
+		if skipSizes {
+			for (key, val) in BSONObject {
+				currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: sizesPointer, sizeFoundCallback: sizeFoundCallback)
+			}
+		} else {
+			for key in BSONObject.keys.sorted() {
+				let val = BSONObject[key]!
+				currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: sizesPointer, sizeFoundCallback: sizeFoundCallback)
+			}
 		}
 		
 		/* Writing final 0 */
@@ -381,6 +397,11 @@ final class BSONSerialization {
 		/* If skipping sizes, we have to call the callback for size found (the doc
 		 * is written entirely, we now know its size! */
 		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition))}
+		
+		if allocatedPointer, let sizesPointer = sizesPointer {
+			sizesPointer.deinitialize(count: 1)
+			sizesPointer.deallocate(capacity: 1)
+		}
 		
 		/* The current write position is indeed the number of bytes written... */
 		return currentRelativeWritePosition
@@ -392,9 +413,10 @@ final class BSONSerialization {
 		
 		var curSize = 4 /* Size of the BSON Doc */
 		var sizes = [Int]()
-		for (key, val) in obj {
+		for key in obj.keys.sorted().reversed() {
+			let val = obj[key]!
 			let sizesInfo = try sizesForBSONEntity(val, withKey: key)
-			sizes.insert(contentsOf: sizesInfo.1, at: 0)
+			sizes.append(contentsOf: sizesInfo.1)
 			curSize += sizesInfo.0
 		}
 		curSize += 1 /* The zero-terminator for BSON docs */
@@ -564,7 +586,7 @@ final class BSONSerialization {
 	
 	- Note: When possible, `sizeFoundCallback` should be optional (cannot be a
 	non-escaped closure in current Swift state). */
-	private class func write(BSONEntity entity: Any?, withKey key: String, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizes: inout [Int]?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+	private class func write(BSONEntity entity: Any?, withKey key: String, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int, sizes: UnsafeMutablePointer<[Int]>?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		var size = 0
@@ -641,11 +663,11 @@ final class BSONSerialization {
 			
 			var arraySize: Int32
 			var computedArraySize = 0
-			if sizes != nil {arraySize = Int32(sizes!.popLast()!)}
-			else            {arraySize = 0}
+			if let sizes = sizes {arraySize = Int32(sizes.pointee.popLast()!)}
+			else                 {arraySize = 0}
 			computedArraySize += try write(value: &arraySize, toStream: stream)
 			for (i, elt) in array.enumerated() {
-				computedArraySize += try write(BSONEntity: elt, withKey: String(i), toStream: stream, options: opt, initialWritePosition: arrayStart + computedArraySize, sizes: &sizes, sizeFoundCallback: sizeFoundCallback)
+				computedArraySize += try write(BSONEntity: elt, withKey: String(i), toStream: stream, options: opt, initialWritePosition: arrayStart + computedArraySize, sizes: sizes, sizeFoundCallback: sizeFoundCallback)
 			}
 			
 			var zero: Int8 = 0
@@ -696,11 +718,11 @@ final class BSONSerialization {
 			
 			var sjsSize: Int32
 			var computedSJSSize = 0
-			if sizes != nil {sjsSize = Int32(sizes!.popLast()!)}
-			else            {sjsSize = 0}
+			if let sizes = sizes {sjsSize = Int32(sizes.pointee.popLast()!)}
+			else                 {sjsSize = 0}
 			computedSJSSize += try write(value: &sjsSize, toStream: stream)
 			computedSJSSize += try write(BSONEncodedString: sjs.javascript, toStream: stream)
-			computedSJSSize += try write(BSONObject: sjs.scope, toStream: stream, options: opt, initialWritePosition: sjsStart + computedSJSSize, sizeFoundCallback: sizeFoundCallback)
+			computedSJSSize += try write(BSONObject: sjs.scope, toStream: stream, options: opt, initialWritePosition: sjsStart + computedSJSSize, sizes: sizes, sizeFoundCallback: sizeFoundCallback)
 			
 			if sizes == nil {sizeFoundCallback(sjsStart, Int32(computedSJSSize))}
 			size += computedSJSSize
