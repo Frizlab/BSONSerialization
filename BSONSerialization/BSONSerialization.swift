@@ -327,7 +327,7 @@ final class BSONSerialization {
 		defer {CFWriteStreamClose(stream)}
 		
 		var sizes = [Int: Int32]()
-		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt.union(.skipSizes), sizeFoundCallback: { offset, size in
+		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt.union(.skipSizes), initialWritePosition: 0, sizes: nil, sizeFoundCallback: { offset, size in
 			assert(sizes[offset] == nil)
 			sizes[offset] = size
 		})
@@ -347,64 +347,11 @@ final class BSONSerialization {
 		return data
 	}
 	
-	/** Write BSON object to a write stream.
+	/** Write the given BSON object to a write stream.
 	
-	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
 	- Returns: The number of bytes written. */
-	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int = 0, sizes knownSizes: UnsafeMutablePointer<[Int]>? = nil, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
-		let skipSizes = opt.contains(.skipSizes)
-		
-		var zero: Int8 = 0
-		
-		var docSize: Int32
-		let allocatedPointer: Bool
-		var currentRelativeWritePosition = 0
-		let sizesPointer: UnsafeMutablePointer<[Int]>?
-		
-		if skipSizes {allocatedPointer = false; sizesPointer = nil; docSize = 0}
-		else {
-			let nonNilSizesPointer: UnsafeMutablePointer<[Int]>
-			if let s = knownSizes {
-				allocatedPointer = false
-				nonNilSizesPointer = s
-			} else {
-				allocatedPointer = true
-				nonNilSizesPointer = UnsafeMutablePointer<[Int]>.allocate(capacity: 1)
-				nonNilSizesPointer.initialize(to: try sizesOfBSONObject(BSONObject), count: 1)
-			}
-			docSize = Int32(nonNilSizesPointer.pointee.popLast()!/* If nil, this is an internal error */)
-			sizesPointer = nonNilSizesPointer
-		}
-		
-		/* Writing doc size to the doc (if size is skipped, set to 0) */
-		currentRelativeWritePosition += try write(value: &docSize, toStream: stream)
-		
-		/* Writing key values to the doc */
-		if skipSizes {
-			for (key, val) in BSONObject {
-				currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: sizesPointer, sizeFoundCallback: sizeFoundCallback)
-			}
-		} else {
-			for key in BSONObject.keys.sorted() {
-				let val = BSONObject[key]!
-				currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: sizesPointer, sizeFoundCallback: sizeFoundCallback)
-			}
-		}
-		
-		/* Writing final 0 */
-		currentRelativeWritePosition += try write(value: &zero, toStream: stream)
-		
-		/* If skipping sizes, we have to call the callback for size found (the doc
-		 * is written entirely, we now know its size! */
-		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition))}
-		
-		if allocatedPointer, let sizesPointer = sizesPointer {
-			sizesPointer.deinitialize(count: 1)
-			sizesPointer.deallocate(capacity: 1)
-		}
-		
-		/* The current write position is indeed the number of bytes written... */
-		return currentRelativeWritePosition
+	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
+		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: {_,_ in})
 	}
 	
 	class func sizesOfBSONObject(_ obj: BSONDoc) throws -> [Int] {
@@ -747,6 +694,66 @@ final class BSONSerialization {
 		}
 		
 		return size
+	}
+	
+	/** Write the given BSON object to a write stream.
+	
+	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
+	- Returns: The number of bytes written. */
+	private class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int, sizes knownSizes: UnsafeMutablePointer<[Int]>?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void) throws -> Int {
+		let skipSizes = opt.contains(.skipSizes)
+		
+		var zero: Int8 = 0
+		
+		var docSize: Int32
+		let allocatedPointer: Bool
+		var currentRelativeWritePosition = 0
+		let sizesPointer: UnsafeMutablePointer<[Int]>?
+		
+		if skipSizes {allocatedPointer = false; sizesPointer = nil; docSize = 0}
+		else {
+			let nonNilSizesPointer: UnsafeMutablePointer<[Int]>
+			if let s = knownSizes {
+				allocatedPointer = false
+				nonNilSizesPointer = s
+			} else {
+				allocatedPointer = true
+				nonNilSizesPointer = UnsafeMutablePointer<[Int]>.allocate(capacity: 1)
+				nonNilSizesPointer.initialize(to: try sizesOfBSONObject(BSONObject), count: 1)
+			}
+			docSize = Int32(nonNilSizesPointer.pointee.popLast()!/* If nil, this is an internal error */)
+			sizesPointer = nonNilSizesPointer
+		}
+		
+		/* Writing doc size to the doc (if size is skipped, set to 0) */
+		currentRelativeWritePosition += try write(value: &docSize, toStream: stream)
+		
+		/* Writing key values to the doc */
+		if skipSizes {
+			for (key, val) in BSONObject {
+				currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: sizesPointer, sizeFoundCallback: sizeFoundCallback)
+			}
+		} else {
+			for key in BSONObject.keys.sorted() {
+				let val = BSONObject[key]!
+				currentRelativeWritePosition += try write(BSONEntity: val, withKey: key, toStream: stream, options: opt, initialWritePosition: currentRelativeWritePosition, sizes: sizesPointer, sizeFoundCallback: sizeFoundCallback)
+			}
+		}
+		
+		/* Writing final 0 */
+		currentRelativeWritePosition += try write(value: &zero, toStream: stream)
+		
+		/* If skipping sizes, we have to call the callback for size found (the doc
+		 * is written entirely, we now know its size! */
+		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition))}
+		
+		if allocatedPointer, let sizesPointer = sizesPointer {
+			sizesPointer.deinitialize(count: 1)
+			sizesPointer.deallocate(capacity: 1)
+		}
+		
+		/* The current write position is indeed the number of bytes written... */
+		return currentRelativeWritePosition
 	}
 	
 	private class func write(CEncodedString str: String, toStream stream: OutputStream) throws -> Int {
