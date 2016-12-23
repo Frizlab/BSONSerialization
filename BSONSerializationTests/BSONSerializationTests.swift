@@ -374,7 +374,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testEncodeDecodeSimpleDateValBSONUsingData() {
 		do {
-			let ref: BSONDoc = ["key": Date()]
+			let ref: BSONDoc = ["key": Date(timeIntervalSince1970: 42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
@@ -650,7 +650,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testEncodeDecodeSimpleDateValBSONUsingStream() {
 		do {
-			let ref: BSONDoc = ["key": Date()]
+			let ref: BSONDoc = ["key": Date(timeIntervalSince1970: 42)]
 			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
