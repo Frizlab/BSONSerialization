@@ -163,7 +163,7 @@ final class BSONSerialization {
 			switch BSONElementType(rawValue: currentElementType) {
 			case .null?:
 				try decodeCallback(key, nil)
-				ret.updateValue(nil, forKey: key) /* Cannot use ret[key] = nil because this has for effect to remove the value for the given key. */
+				ret[key] = .some(nil)
 				
 			case .boolean?:
 				let valAsInt8 = try bufferStream.readData(size: 1, alwaysCopyBytes: false).first!
