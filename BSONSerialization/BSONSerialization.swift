@@ -216,8 +216,12 @@ final class BSONSerialization {
 					default: throw BSONSerializationError.invalidRegularExpressionOptions(options: options, invalidCharacter: c)
 					}
 				}
-				do    {let val = try NSRegularExpression(pattern: pattern, options: foundationOptions); try decodeCallback(key, val); ret[key] = val}
+				let val: NSRegularExpression
+				do    {val = try NSRegularExpression(pattern: pattern, options: foundationOptions)}
 				catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
+				
+				try decodeCallback(key, val)
+				ret[key] = val
 				
 			case .utf8String?:
 				let val = try bufferStream.readBSONString(encoding: .utf8)
