@@ -131,7 +131,8 @@ final class BSONSerialization {
 		return try BSONObject(bufferStream: bufferedInputStream, options: opt)
 	}
 	
-	/* Note: Whenever we can, I'd like to have a non-escaping optional closure... */
+	/* Note: Whenever we can, I'd like to have a non-escaping optional closure...
+	 * Other Note: decodeCallback is **NOT** called when a SUB-key is decoded. */
 	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions, initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
