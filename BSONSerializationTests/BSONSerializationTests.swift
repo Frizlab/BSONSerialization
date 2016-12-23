@@ -781,6 +781,32 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	
+	func testIsValidBSONDoc1() {
+		let valid: BSONDoc = [:]
+		XCTAssertTrue(BSONSerialization.isValidBSONObject(valid))
+	}
+	
+	func testIsValidBSONDoc2() {
+		let valid: BSONDoc = ["key": "val"]
+		XCTAssertTrue(BSONSerialization.isValidBSONObject(valid))
+	}
+	
+	func testIsValidBSONDoc3() {
+		let valid: BSONDoc = ["key": ["subkey": "subval"]]
+		XCTAssertTrue(BSONSerialization.isValidBSONObject(valid))
+	}
+	
+	func testIsInvalidBSONDoc1() {
+		let invalid: BSONDoc = ["key": NSURL(string: "https://www.apple.com/")!]
+		XCTAssertFalse(BSONSerialization.isValidBSONObject(invalid))
+	}
+	
+	func testIsInvalidBSONDoc2() {
+		let invalid: BSONDoc = ["key": ["subkey": NSURL(string: "https://www.apple.com/")!]]
+		XCTAssertFalse(BSONSerialization.isValidBSONObject(invalid))
+	}
+	
+	
 	private func dataFromWriteStream(writeBlock: (_ writeStream: OutputStream) throws -> Void) rethrows -> Data {
 		let stream = CFWriteStreamCreateWithAllocatedBuffers(kCFAllocatorDefault, kCFAllocatorDefault)!
 		guard CFWriteStreamOpen(stream) else {fatalError("Cannot open write stream")}
