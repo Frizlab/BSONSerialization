@@ -12,7 +12,7 @@ import Foundation
 
 
 
-class BufferStreamTests: XCTestCase {
+class BufferedInputStreamTests: XCTestCase {
 	
 	override func setUp() {
 		super.setUp()

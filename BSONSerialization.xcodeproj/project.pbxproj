@@ -33,6 +33,8 @@
 		7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferedInputStreamTests.swift; sourceTree = "<group>"; };
 		7B2FA1B71E069E7500087805 /* TestHelpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
 		7B51261C1E0E7EA5008A1EAA /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
+		7B51261D1E0E8B57008A1EAA /* LinuxMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LinuxMain.swift; path = ../LinuxMain.swift; sourceTree = "<group>"; };
+		7B51261E1E0E8F7F008A1EAA /* generate_linux_main.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; name = generate_linux_main.sh; path = Tests/generate_linux_main.sh; sourceTree = SOURCE_ROOT; };
 		7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BSONSerialization.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BC105801C4C425C004CFB30 /* BSONSerialization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSONSerialization.h; sourceTree = "<group>"; };
 		7BC105821C4C425C004CFB30 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -104,6 +106,8 @@
 				7B2FA1B71E069E7500087805 /* TestHelpers.swift */,
 				7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */,
 				7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */,
+				7B51261E1E0E8F7F008A1EAA /* generate_linux_main.sh */,
+				7B51261D1E0E8B57008A1EAA /* LinuxMain.swift */,
 				7BC1058E1C4C425C004CFB30 /* Info.plist */,
 			);
 			name = Tests;
