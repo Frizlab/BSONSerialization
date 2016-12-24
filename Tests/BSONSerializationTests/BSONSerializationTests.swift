@@ -862,7 +862,7 @@ class BSONSerializationTests: XCTestCase {
 		
 		try writeBlock(stream)
 		
-		return stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as! Data
+		return Data(referencing: stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as! NSData)
 	}
 	
 }

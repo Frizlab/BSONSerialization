@@ -329,10 +329,11 @@ final class BSONSerialization {
 			sizes[offset] = size
 		})
 		
-		guard var data = stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as? Data else {
+		guard let nsdata = stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as? NSData else {
 			throw BSONSerializationError.internalError
 		}
 		
+		var data = Data(referencing: nsdata)
 		if !opt.contains(.skipSizes) {
 			data.withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in
 				for (offset, size) in sizes {
