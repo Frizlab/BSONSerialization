@@ -7,7 +7,6 @@
  */
 
 import Foundation
-import CoreFoundation
 
 
 
@@ -319,13 +318,10 @@ final class BSONSerialization {
 	}
 	
 	class func data(withBSONObject BSONObject: BSONDoc, options opt: BSONWritingOptions) throws -> Data {
-		guard let stream = CFWriteStreamCreateWithAllocatedBuffers(kCFAllocatorDefault, kCFAllocatorDefault) else {
-			throw BSONSerializationError.internalError
-		}
-		guard CFWriteStreamOpen(stream) else {
-			throw BSONSerializationError.internalError
-		}
-		defer {CFWriteStreamClose(stream)}
+		let stream = OutputStream(toMemory: ())
+		
+		stream.open()
+		defer {stream.close()}
 		
 		var sizes = [Int: Int32]()
 		_ = try write(BSONObject: BSONObject, toStream: stream, options: opt.union(.skipSizes), initialWritePosition: 0, sizes: nil, sizeFoundCallback: { offset, size in
@@ -333,7 +329,7 @@ final class BSONSerialization {
 			sizes[offset] = size
 		})
 		
-		guard var data = CFWriteStreamCopyProperty(stream, .dataWritten) as AnyObject as? Data else {
+		guard var data = stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as? Data else {
 			throw BSONSerializationError.internalError
 		}
 		

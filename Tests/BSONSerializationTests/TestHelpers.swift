@@ -61,13 +61,4 @@ extension Data {
 		return res.uppercased()
 	}
 	
-	func asStream() -> InputStream? {
-		return withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> InputStream in
-			/* We must not release the bytes memory (which explains the latest
-			 * argument to the stream creation function): the data object will do it
-			 * when released (after the stream has finished being used). */
-			return CFReadStreamCreateWithBytesNoCopy(kCFAllocatorDefault, bytes, count, kCFAllocatorNull)
-		}
-	}
-	
 }

@@ -26,9 +26,8 @@ class BufferStreamTests: XCTestCase {
 	}
 	
 	func testReadSmallerThanBufferData() {
-		let s = stream(fromData: Data(hexEncoded: "01 23 45 67 89")!)!
-		CFReadStreamOpen(s)
-		defer {CFReadStreamClose(s)}
+		let s = InputStream(data: Data(hexEncoded: "01 23 45 67 89")!)
+		s.open(); defer {s.close()}
 		
 		let bs = BufferedInputStream(stream: s, bufferSize: 3, streamReadSizeLimit: nil)
 		let d = try? bs.readData(size: 2, alwaysCopyBytes: false)
@@ -36,29 +35,12 @@ class BufferStreamTests: XCTestCase {
 	}
 	
 	func testReadBiggerThanBufferData() {
-		let s = stream(fromData: Data(hexEncoded: "01 23 45 67 89")!)!
-		CFReadStreamOpen(s)
-		defer {CFReadStreamClose(s)}
+		let s = InputStream(data: Data(hexEncoded: "01 23 45 67 89")!)
+		s.open(); defer {s.close()}
 		
 		let bs = BufferedInputStream(stream: s, bufferSize: 3, streamReadSizeLimit: nil)
 		let d = try? bs.readData(size: 4, alwaysCopyBytes: false)
 		XCTAssert(d == Data(hexEncoded: "01 23 45 67")!)
-	}
-	
-	/* ***************
-	   MARK: - Helpers
-	   *************** */
-	
-	private func stream(fromData data: Data) -> CFReadStream? {
-		let dataBytes = (data as NSData).bytes
-		
-		/* We must not release the bytes memory (which explains the latest
-		 * argument to the stream creation function): the data object will do it
-		 * when released (after the stream has finished being used). */
-		guard let stream = CFReadStreamCreateWithBytesNoCopy(kCFAllocatorDefault, unsafeBitCast(dataBytes, to: UnsafePointer<UInt8>.self), data.count, kCFAllocatorNull) else {
-			return nil
-		}
-		return stream
 	}
 	
 }

@@ -111,8 +111,8 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testDecodeEmptyBSONFromStream() {
 		do {
-			let stream = Data(hexEncoded: "05 00 00 00 00")!.asStream()!
-			CFReadStreamOpen(stream); defer {CFReadStreamClose(stream)}
+			let stream = InputStream(data: Data(hexEncoded: "05 00 00 00 00")!)
+			stream.open(); defer {stream.close()}
 			
 			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
 			let e = [String: Any]() as NSDictionary
@@ -124,8 +124,8 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testSimpleEmbeddedDocFromStream() {
 		do {
-			let stream = Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!.asStream()!
-			CFReadStreamOpen(stream); defer {CFReadStreamClose(stream)}
+			let stream = InputStream(data: Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!)
+			stream.open(); defer {stream.close()}
 			
 			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
 			let e = ["doc": ["abc": "def"]] as NSDictionary
@@ -854,13 +854,14 @@ class BSONSerializationTests: XCTestCase {
 	
 	
 	private func dataFromWriteStream(writeBlock: (_ writeStream: OutputStream) throws -> Void) rethrows -> Data {
-		let stream = CFWriteStreamCreateWithAllocatedBuffers(kCFAllocatorDefault, kCFAllocatorDefault)!
-		guard CFWriteStreamOpen(stream) else {fatalError("Cannot open write stream")}
-		defer {CFWriteStreamClose(stream)}
+		let stream = OutputStream(toMemory: ())
+		
+		stream.open()
+		defer {stream.close()}
 		
 		try writeBlock(stream)
 		
-		return CFWriteStreamCopyProperty(stream, .dataWritten) as AnyObject as! Data
+		return stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as! Data
 	}
 	
 }
