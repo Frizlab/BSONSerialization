@@ -385,7 +385,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testEncodeDecodeSimpleRegexValBSONUsingData() {
 		do {
-			let ref: BSONDoc = ["key": try! NSRegularExpression(pattern: ".*", options: [])]
+			let ref: BSONDoc = ["key": try! CPRegularExpression(pattern: ".*", options: [])]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
@@ -673,7 +673,7 @@ class BSONSerializationTests: XCTestCase {
 	
 	func testEncodeDecodeSimpleRegexValBSONUsingStream() {
 		do {
-			let ref: BSONDoc = ["key": try! NSRegularExpression(pattern: ".*", options: [])]
+			let ref: BSONDoc = ["key": try! CPRegularExpression(pattern: ".*", options: [])]
 			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
 			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
