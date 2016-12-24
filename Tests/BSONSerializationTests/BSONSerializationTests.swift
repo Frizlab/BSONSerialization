@@ -29,9 +29,9 @@ class BSONSerializationTests: XCTestCase {
 	func testDecodeEmptyBSONFromData() {
 		do {
 			let data = Data(hexEncoded: "05 00 00 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
-			let e = [String: Any]() as NSDictionary
-			XCTAssertEqual(r, e)
+			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let e = [String: Any]()
+			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -40,9 +40,9 @@ class BSONSerializationTests: XCTestCase {
 	func testDecodeKeyAbcValDefFromData() {
 		do {
 			let data = Data(hexEncoded: "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
-			let e = ["abc": "def"] as NSDictionary
-			XCTAssertEqual(r, e)
+			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let e = ["abc": "def"]
+			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -51,9 +51,9 @@ class BSONSerializationTests: XCTestCase {
 	func testSimpleEmbeddedDocFromData() {
 		do {
 			let data = Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
-			let e = ["doc": ["abc": "def"]] as NSDictionary
-			XCTAssertEqual(r, e)
+			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let e = ["doc": ["abc": "def"]]
+			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -62,9 +62,9 @@ class BSONSerializationTests: XCTestCase {
 	func testSimpleArrayFromData() {
 		do {
 			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 30 00 04 00 00 00 61 62 63 00 02 31 00 04 00 00 00 64 65 66 00 02 32 00 04 00 00 00 67 68 69 00 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
-			let e = ["col": ["abc", "def", "ghi"]] as NSDictionary
-			XCTAssertEqual(r, e)
+			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let e = ["col": ["abc", "def", "ghi"]]
+			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -73,7 +73,7 @@ class BSONSerializationTests: XCTestCase {
 	func testInvalidFirstKeySimpleArrayFromData() {
 		do {
 			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 31 00 04 00 00 00 61 62 63 00 02 32 00 04 00 00 00 64 65 66 00 02 33 00 04 00 00 00 67 68 69 00 00 00")!
-			_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+			_ = try BSONSerialization.BSONObject(data: data, options: [])
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
@@ -86,7 +86,7 @@ class BSONSerializationTests: XCTestCase {
 	func testInvalidSecondKeySimpleArrayFromData() {
 		do {
 			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 30 00 04 00 00 00 61 62 63 00 02 32 00 04 00 00 00 64 65 66 00 02 33 00 04 00 00 00 67 68 69 00 00 00")!
-			_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+			_ = try BSONSerialization.BSONObject(data: data, options: [])
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
@@ -101,7 +101,7 @@ class BSONSerializationTests: XCTestCase {
 		self.measure {
 			for _ in 0..<4242 {
 				do {
-					_ = try BSONSerialization.BSONObject(data: data, options: []) as NSDictionary
+					_ = try BSONSerialization.BSONObject(data: data, options: [])
 				} catch {
 					XCTFail("\(error)")
 				}
@@ -115,9 +115,9 @@ class BSONSerializationTests: XCTestCase {
 			let stream = InputStream(data: Data(hexEncoded: "05 00 00 00 00")!)
 			stream.open(); defer {stream.close()}
 			
-			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
-			let e = [String: Any]() as NSDictionary
-			XCTAssertEqual(r, e)
+			let r = try BSONSerialization.BSONObject(stream: stream, options: [])
+			let e = [String: Any]()
+			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
 			XCTFail("\(error)")
 		}
@@ -128,9 +128,9 @@ class BSONSerializationTests: XCTestCase {
 			let stream = InputStream(data: Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!)
 			stream.open(); defer {stream.close()}
 			
-			let r = try BSONSerialization.BSONObject(stream: stream, options: []) as NSDictionary
-			let e = ["doc": ["abc": "def"]] as NSDictionary
-			XCTAssertEqual(r, e)
+			let r = try BSONSerialization.BSONObject(stream: stream, options: [])
+			let e = ["doc": ["abc": "def"]]
+			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
 			XCTFail("\(error)")
 		}
