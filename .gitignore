@@ -1,3 +1,6 @@
 # Finder and Xcode ignored files
 .DS_Store
 xcuserdata/
+
+# SwiftPM
+/.build/

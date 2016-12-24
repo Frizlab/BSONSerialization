@@ -32,6 +32,7 @@
 		7B1929371E0C964800DC3848 /* BSONClasses.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BSONClasses.swift; sourceTree = "<group>"; };
 		7B2FA1B51E06997300087805 /* BufferedInputStreamTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BufferedInputStreamTests.swift; sourceTree = "<group>"; };
 		7B2FA1B71E069E7500087805 /* TestHelpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
+		7B51261C1E0E7EA5008A1EAA /* Package.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Package.swift; sourceTree = "<group>"; };
 		7BC1057D1C4C425C004CFB30 /* BSONSerialization.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = BSONSerialization.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BC105801C4C425C004CFB30 /* BSONSerialization.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BSONSerialization.h; sourceTree = "<group>"; };
 		7BC105821C4C425C004CFB30 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -65,8 +66,9 @@
 			isa = PBXGroup;
 			children = (
 				7BF109371E0DE7D50070292C /* Readme.md */,
-				7BC1057F1C4C425C004CFB30 /* BSONSerialization */,
-				7BC1058B1C4C425C004CFB30 /* BSONSerializationTests */,
+				7B51261C1E0E7EA5008A1EAA /* Package.swift */,
+				7BC1057F1C4C425C004CFB30 /* Sources */,
+				7BC1058B1C4C425C004CFB30 /* Tests */,
 				7BC1057E1C4C425C004CFB30 /* Products */,
 			);
 			indentWidth = 3;
@@ -84,19 +86,19 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		7BC1057F1C4C425C004CFB30 /* BSONSerialization */ = {
+		7BC1057F1C4C425C004CFB30 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				7BC105801C4C425C004CFB30 /* BSONSerialization.h */,
 				7B1120561DF4708B0048AE37 /* BufferStream.swift */,
 				7B1929371E0C964800DC3848 /* BSONClasses.swift */,
 				7BC105971C4C49AB004CFB30 /* BSONSerialization.swift */,
+				7BC105801C4C425C004CFB30 /* BSONSerialization.h */,
 				7BC105821C4C425C004CFB30 /* Info.plist */,
 			);
-			path = BSONSerialization;
+			path = Sources;
 			sourceTree = "<group>";
 		};
-		7BC1058B1C4C425C004CFB30 /* BSONSerializationTests */ = {
+		7BC1058B1C4C425C004CFB30 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
 				7B2FA1B71E069E7500087805 /* TestHelpers.swift */,
@@ -104,7 +106,8 @@
 				7BC1058C1C4C425C004CFB30 /* BSONSerializationTests.swift */,
 				7BC1058E1C4C425C004CFB30 /* Info.plist */,
 			);
-			path = BSONSerializationTests;
+			name = Tests;
+			path = Tests/BSONSerializationTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -344,7 +347,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_VERSION = A;
-				INFOPLIST_FILE = BSONSerialization/Info.plist;
+				INFOPLIST_FILE = Sources/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = me.frizlab.BSONSerialization;
@@ -365,7 +368,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_VERSION = A;
-				INFOPLIST_FILE = BSONSerialization/Info.plist;
+				INFOPLIST_FILE = Sources/Info.plist;
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = me.frizlab.BSONSerialization;
@@ -380,7 +383,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				INFOPLIST_FILE = BSONSerializationTests/Info.plist;
+				INFOPLIST_FILE = Tests/BSONSerializationTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = me.frizlab.BSONSerializationTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -392,7 +395,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COMBINE_HIDPI_IMAGES = YES;
-				INFOPLIST_FILE = BSONSerializationTests/Info.plist;
+				INFOPLIST_FILE = Tests/BSONSerializationTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks @loader_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = me.frizlab.BSONSerializationTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
