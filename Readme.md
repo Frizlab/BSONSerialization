@@ -70,5 +70,5 @@ open issues, I’ll do my best to answer.
 
 Pull requests are welcome 😉
 
-## Licence
-Not yet chosen.
+## License
+MIT (see License.txt file)
