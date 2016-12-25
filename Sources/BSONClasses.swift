@@ -14,17 +14,21 @@ import Foundation
  * class name to represent a regular expression, though the class is basically
  * the same. */
 #if os(Linux)
-	typealias CPRegularExpression = RegularExpression
+	public typealias CPRegularExpression = RegularExpression
 #else
-	typealias CPRegularExpression = NSRegularExpression
+	public typealias CPRegularExpression = NSRegularExpression
 #endif
 
 
-struct Double128 : Equatable /*, AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
+public struct Double128 : Equatable /*, AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
 	
-	let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+	public let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
 	
-	static func ==(lhs: Double128, rhs: Double128) -> Bool {
+	public init(data d: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)) {
+		data = d
+	}
+	
+	public static func ==(lhs: Double128, rhs: Double128) -> Bool {
 		return (
 			lhs.data.0  == rhs.data.0  && lhs.data.1  == rhs.data.1  && lhs.data.2  == rhs.data.2  && lhs.data.3  == rhs.data.3  &&
 			lhs.data.4  == rhs.data.4  && lhs.data.5  == rhs.data.5  && lhs.data.6  == rhs.data.6  && lhs.data.7  == rhs.data.7  &&
@@ -36,19 +40,19 @@ struct Double128 : Equatable /*, AbsoluteValuable, BinaryFloatingPoint, Expressi
 }
 
 
-struct MongoTimestamp : Equatable {
+public struct MongoTimestamp : Equatable {
 	
-	let increment: (UInt8, UInt8, UInt8, UInt8)
-	let timestamp: (UInt8, UInt8, UInt8, UInt8)
+	public let increment: (UInt8, UInt8, UInt8, UInt8)
+	public let timestamp: (UInt8, UInt8, UInt8, UInt8)
 	
-	init(incrementData: Data, timestampData: Data) {
+	public init(incrementData: Data, timestampData: Data) {
 		assert(incrementData.count == 4)
 		assert(timestampData.count == 4)
 		increment = (incrementData[0], incrementData[1], incrementData[2], incrementData[3])
 		timestamp = (timestampData[0], timestampData[1], timestampData[2], timestampData[3])
 	}
 	
-	static func ==(lhs: MongoTimestamp, rhs: MongoTimestamp) -> Bool {
+	public static func ==(lhs: MongoTimestamp, rhs: MongoTimestamp) -> Bool {
 		return (
 			lhs.increment.0 == rhs.increment.0 && lhs.increment.1 == rhs.increment.1 && lhs.increment.2 == rhs.increment.2 && lhs.increment.3 == rhs.increment.3 &&
 			lhs.timestamp.0 == rhs.timestamp.0 && lhs.timestamp.1 == rhs.timestamp.1 && lhs.timestamp.2 == rhs.timestamp.2 && lhs.timestamp.3 == rhs.timestamp.3
@@ -58,9 +62,9 @@ struct MongoTimestamp : Equatable {
 }
 
 
-struct MongoBinary : Equatable {
+public struct MongoBinary : Equatable {
 	
-	enum BinarySubtype : UInt8 {
+	public enum BinarySubtype : UInt8 {
 		case genericBinary = 0x00
 		case function      = 0x01
 		case uuid          = 0x04
@@ -73,14 +77,19 @@ struct MongoBinary : Equatable {
 		case binaryOld     = 0x02
 	}
 	
-	let binaryTypeAsInt: UInt8
-	let data: Data
+	public let binaryTypeAsInt: UInt8
+	public let data: Data
 	
-	static func ==(lhs: MongoBinary, rhs: MongoBinary) -> Bool {
+	public init(binaryTypeAsInt bti: UInt8, data d: Data) {
+		binaryTypeAsInt = bti
+		data = d
+	}
+	
+	public static func ==(lhs: MongoBinary, rhs: MongoBinary) -> Bool {
 		return lhs.binaryTypeAsInt == rhs.binaryTypeAsInt && lhs.data == rhs.data
 	}
 	
-	var binaryType: BinarySubtype? {
+	public var binaryType: BinarySubtype? {
 		if let t = BinarySubtype(rawValue: binaryTypeAsInt) {return t}
 		if binaryTypeAsInt >= BinarySubtype.userDefined.rawValue {return BinarySubtype.userDefined}
 		return nil
@@ -89,11 +98,15 @@ struct MongoBinary : Equatable {
 }
 
 
-struct MongoObjectId : Equatable {
+public struct MongoObjectId : Equatable {
 	
-	let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+	public let data: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
 	
-	static func ==(lhs: MongoObjectId, rhs: MongoObjectId) -> Bool {
+	public init(data d: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)) {
+		data = d
+	}
+	
+	public static func ==(lhs: MongoObjectId, rhs: MongoObjectId) -> Bool {
 		return (
 			lhs.data.0  == rhs.data.0  && lhs.data.1  == rhs.data.1  && lhs.data.2  == rhs.data.2  && lhs.data.3  == rhs.data.3  &&
 			lhs.data.4  == rhs.data.4  && lhs.data.5  == rhs.data.5  && lhs.data.6  == rhs.data.6  && lhs.data.7  == rhs.data.7  &&
@@ -104,61 +117,76 @@ struct MongoObjectId : Equatable {
 }
 
 
-struct Javascript : Equatable {
+public struct Javascript : Equatable {
 	
-	let javascript: String
+	public let javascript: String
 	
-	static func ==(lhs: Javascript, rhs: Javascript) -> Bool {
+	public init(javascript js: String) {
+		javascript = js
+	}
+	
+	public static func ==(lhs: Javascript, rhs: Javascript) -> Bool {
 		return lhs.javascript == rhs.javascript
 	}
 	
 }
 
 
-struct JavascriptWithScope : Equatable {
+public struct JavascriptWithScope : Equatable {
 	
-	let javascript: String
-	let scope: BSONDoc
+	public let javascript: String
+	public let scope: BSONDoc
 	
-	static func ==(lhs: JavascriptWithScope, rhs: JavascriptWithScope) -> Bool {
+	public init(javascript js: String, scope s: BSONDoc) {
+		javascript = js
+		scope = s
+	}
+	
+	public static func ==(lhs: JavascriptWithScope, rhs: JavascriptWithScope) -> Bool {
 		return lhs.javascript == rhs.javascript && ((try? areBSONDocEqual(lhs.scope, rhs.scope)) ?? false)
 	}
 	
 }
 
 
-struct MinKey : Comparable {
+public struct MinKey : Comparable {
 	
-	static func ==(lhs: MinKey, rhs: MinKey) -> Bool {return true}
-	static func ==(lhs: MinKey, rhs: Any?) -> Bool {return false}
-	static func ==(lhs: Any?, rhs: MinKey) -> Bool {return false}
+	public init() {
+	}
 	
-	static func <(lhs: MinKey, rhs: MinKey) -> Bool {return false}
-	static func <(lhs: MinKey, rhs: Any?) -> Bool {return true}
-	static func <(lhs: Any?, rhs: MinKey) -> Bool {return false}
+	public static func ==(lhs: MinKey, rhs: MinKey) -> Bool {return true}
+	public static func ==(lhs: MinKey, rhs: Any?) -> Bool {return false}
+	public static func ==(lhs: Any?, rhs: MinKey) -> Bool {return false}
 	
-}
-
-
-struct MaxKey : Comparable {
-	
-	static func ==(lhs: MaxKey, rhs: MaxKey) -> Bool {return true}
-	static func ==(lhs: MaxKey, rhs: Any?) -> Bool {return false}
-	static func ==(lhs: Any?, rhs: MaxKey) -> Bool {return false}
-	
-	static func <(lhs: MaxKey, rhs: MaxKey) -> Bool {return false}
-	static func <(lhs: MaxKey, rhs: Any?) -> Bool {return false}
-	static func <(lhs: Any?, rhs: MaxKey) -> Bool {return true}
+	public static func <(lhs: MinKey, rhs: MinKey) -> Bool {return false}
+	public static func <(lhs: MinKey, rhs: Any?) -> Bool {return true}
+	public static func <(lhs: Any?, rhs: MinKey) -> Bool {return false}
 	
 }
 
 
-struct MongoDBPointer : Equatable {
+public struct MaxKey : Comparable {
 	
-	let stringPart: String
-	let bytesPart: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+	public init() {
+	}
 	
-	init(stringPart str: String, bytesPartData: Data) {
+	public static func ==(lhs: MaxKey, rhs: MaxKey) -> Bool {return true}
+	public static func ==(lhs: MaxKey, rhs: Any?) -> Bool {return false}
+	public static func ==(lhs: Any?, rhs: MaxKey) -> Bool {return false}
+	
+	public static func <(lhs: MaxKey, rhs: MaxKey) -> Bool {return false}
+	public static func <(lhs: MaxKey, rhs: Any?) -> Bool {return false}
+	public static func <(lhs: Any?, rhs: MaxKey) -> Bool {return true}
+	
+}
+
+
+public struct MongoDBPointer : Equatable {
+	
+	public let stringPart: String
+	public let bytesPart: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+	
+	public init(stringPart str: String, bytesPartData: Data) {
 		assert(bytesPartData.count == 12)
 		stringPart = str
 		bytesPart = (
@@ -168,7 +196,7 @@ struct MongoDBPointer : Equatable {
 		)
 	}
 	
-	static func ==(lhs: MongoDBPointer, rhs: MongoDBPointer) -> Bool {
+	public static func ==(lhs: MongoDBPointer, rhs: MongoDBPointer) -> Bool {
 		return (
 			lhs.stringPart == rhs.stringPart &&
 			lhs.bytesPart.0  == rhs.bytesPart.0  && lhs.bytesPart.1  == rhs.bytesPart.1  && lhs.bytesPart.2  == rhs.bytesPart.2  && lhs.bytesPart.3  == rhs.bytesPart.3  &&
@@ -182,7 +210,7 @@ struct MongoDBPointer : Equatable {
 
 /** Check both given BSONDoc for equality. Throws if the docs are not valid BSON
 docs! */
-func areBSONDocEqual(_ doc1: BSONDoc, _ doc2: BSONDoc) throws -> Bool {
+public func areBSONDocEqual(_ doc1: BSONDoc, _ doc2: BSONDoc) throws -> Bool {
 	guard doc1.count == doc2.count else {return false}
 	for (key, val1) in doc1 {
 		guard let val2 = doc2[key] else {return false}

@@ -10,25 +10,33 @@ import Foundation
 
 
 
-typealias BSONDoc = [String: Any?]
+public typealias BSONDoc = [String: Any?]
 
-struct BSONReadingOptions : OptionSet {
-	let rawValue: Int
+public struct BSONReadingOptions : OptionSet {
+	public let rawValue: Int
 	/* Empty. We just create the enum in case we want to add something to it later. */
-}
-
-
-struct BSONWritingOptions : OptionSet {
-	let rawValue: Int
 	
-	static let skipSizes = BSONWritingOptions(rawValue: 1 << 0)
+	public init(rawValue v: Int) {
+		rawValue = v
+	}
 }
 
 
-final class BSONSerialization {
+public struct BSONWritingOptions : OptionSet {
+	public let rawValue: Int
+	
+	public static let skipSizes = BSONWritingOptions(rawValue: 1 << 0)
+	
+	public init(rawValue v: Int) {
+		rawValue = v
+	}
+}
+
+
+final public class BSONSerialization {
 	
 	/** The BSON Serialization errors enum. */
-	enum BSONSerializationError : Error {
+	public enum BSONSerializationError : Error {
 		/** The given data/stream contains too few bytes to be a valid bson doc. */
 		case dataTooSmall
 		/** The given data size is not the one declared by the bson doc. */
@@ -108,7 +116,7 @@ final class BSONSerialization {
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> BSONDoc {
+	public class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> BSONDoc {
 		let bufferedData = BufferedData(data: data)
 		return try BSONObject(bufferStream: bufferedData, options: opt)
 	}
@@ -126,7 +134,7 @@ final class BSONSerialization {
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
+	public class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
 		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamReadSizeLimit: nil)
 		return try BSONObject(bufferStream: bufferedInputStream, options: opt)
 	}
@@ -317,7 +325,7 @@ final class BSONSerialization {
 		return ret
 	}
 	
-	class func data(withBSONObject BSONObject: BSONDoc, options opt: BSONWritingOptions) throws -> Data {
+	public class func data(withBSONObject BSONObject: BSONDoc, options opt: BSONWritingOptions) throws -> Data {
 		let stream = OutputStream(toMemory: ())
 		
 		stream.open()
@@ -348,11 +356,11 @@ final class BSONSerialization {
 	/** Write the given BSON object to a write stream.
 	
 	- Returns: The number of bytes written. */
-	class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
+	public class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
 		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: {_,_ in})
 	}
 	
-	class func sizesOfBSONObject(_ obj: BSONDoc) throws -> [Int] {
+	public class func sizesOfBSONObject(_ obj: BSONDoc) throws -> [Int] {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		precondition(MemoryLayout<Int>.size <= MemoryLayout<Int64>.size, "I currently need Int to be lower or equal in size than Int64")
 		

@@ -1,5 +1,5 @@
 # BSONSerialization
-BSON Serialization in native Swift 3 (with the help of Apple’s Foundation)
+BSON Serialization in native Swift 3
 
 ## Installation & Compatibility
 Currently BSONSerialization has been tested on macOS only, in Xcode 8.2.1
