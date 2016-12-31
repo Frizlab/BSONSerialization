@@ -29,7 +29,7 @@ class BSONSerializationTests: XCTestCase {
 	func testDecodeEmptyBSONFromData() {
 		do {
 			let data = Data(hexEncoded: "05 00 00 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let r = try BSONSerialization.bsonObject(with: data, options: [])
 			let e = [String: Any]()
 			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
@@ -40,7 +40,7 @@ class BSONSerializationTests: XCTestCase {
 	func testDecodeKeyAbcValDefFromData() {
 		do {
 			let data = Data(hexEncoded: "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let r = try BSONSerialization.bsonObject(with: data, options: [])
 			let e = ["abc": "def"]
 			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
@@ -51,7 +51,7 @@ class BSONSerializationTests: XCTestCase {
 	func testSimpleEmbeddedDocFromData() {
 		do {
 			let data = Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let r = try BSONSerialization.bsonObject(with: data, options: [])
 			let e = ["doc": ["abc": "def"]]
 			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
@@ -62,7 +62,7 @@ class BSONSerializationTests: XCTestCase {
 	func testSimpleArrayFromData() {
 		do {
 			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 30 00 04 00 00 00 61 62 63 00 02 31 00 04 00 00 00 64 65 66 00 02 32 00 04 00 00 00 67 68 69 00 00 00")!
-			let r = try BSONSerialization.BSONObject(data: data, options: [])
+			let r = try BSONSerialization.bsonObject(with: data, options: [])
 			let e = ["col": ["abc", "def", "ghi"]]
 			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
@@ -73,7 +73,7 @@ class BSONSerializationTests: XCTestCase {
 	func testInvalidFirstKeySimpleArrayFromData() {
 		do {
 			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 31 00 04 00 00 00 61 62 63 00 02 32 00 04 00 00 00 64 65 66 00 02 33 00 04 00 00 00 67 68 69 00 00 00")!
-			_ = try BSONSerialization.BSONObject(data: data, options: [])
+			_ = try BSONSerialization.bsonObject(with: data, options: [])
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
@@ -86,7 +86,7 @@ class BSONSerializationTests: XCTestCase {
 	func testInvalidSecondKeySimpleArrayFromData() {
 		do {
 			let data = Data(hexEncoded: "30 00 00 00 04 63 6F 6C 00 26 00 00 00 02 30 00 04 00 00 00 61 62 63 00 02 32 00 04 00 00 00 64 65 66 00 02 33 00 04 00 00 00 67 68 69 00 00 00")!
-			_ = try BSONSerialization.BSONObject(data: data, options: [])
+			_ = try BSONSerialization.bsonObject(with: data, options: [])
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
@@ -101,7 +101,7 @@ class BSONSerializationTests: XCTestCase {
 		self.measure {
 			for _ in 0..<4242 {
 				do {
-					_ = try BSONSerialization.BSONObject(data: data, options: [])
+					_ = try BSONSerialization.bsonObject(with: data, options: [])
 				} catch {
 					XCTFail("\(error)")
 				}
@@ -115,7 +115,7 @@ class BSONSerializationTests: XCTestCase {
 			let stream = InputStream(data: Data(hexEncoded: "05 00 00 00 00")!)
 			stream.open(); defer {stream.close()}
 			
-			let r = try BSONSerialization.BSONObject(stream: stream, options: [])
+			let r = try BSONSerialization.bsonObject(with: stream, options: [])
 			let e = [String: Any]()
 			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
@@ -128,7 +128,7 @@ class BSONSerializationTests: XCTestCase {
 			let stream = InputStream(data: Data(hexEncoded: "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00")!)
 			stream.open(); defer {stream.close()}
 			
-			let r = try BSONSerialization.BSONObject(stream: stream, options: [])
+			let r = try BSONSerialization.bsonObject(with: stream, options: [])
 			let e = ["doc": ["abc": "def"]]
 			XCTAssert(try areBSONDocEqual(r, e))
 		} catch {
@@ -212,7 +212,7 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeEmptyBSONToStream() {
 		do {
 			let ref = "05 00 00 00 00"
-			let res = try dataFromWriteStream { _ = try BSONSerialization.write(BSONObject: [:], toStream: $0, options: []) }.hexEncodedString()
+			let res = try dataFromWriteStream { _ = try BSONSerialization.writeBSONObject([:], to: $0, options: []) }.hexEncodedString()
 			XCTAssertEqual(res, ref)
 		} catch {
 			XCTFail("\(error)")
@@ -222,7 +222,7 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeSimpleEmbeddedBSONToStream() {
 		do {
 			let ref = "1C 00 00 00 03 64 6F 63 00 12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00 00"
-			let res = try dataFromWriteStream { _ = try BSONSerialization.write(BSONObject: ["doc": ["abc": "def"]], toStream: $0, options: []) }.hexEncodedString()
+			let res = try dataFromWriteStream { _ = try BSONSerialization.writeBSONObject(["doc": ["abc": "def"]], to: $0, options: []) }.hexEncodedString()
 			XCTAssertEqual(res, ref)
 		} catch {
 			XCTFail("\(error)")
@@ -234,7 +234,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = [:]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -245,7 +245,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["": "def"]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -256,7 +256,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["abc": ""]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -267,7 +267,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["": ""]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -278,7 +278,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["abc": "def"]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -289,7 +289,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["abc": "def", "ghi": "jkl"]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -300,7 +300,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": nil]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -311,7 +311,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": true]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -322,7 +322,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": 42]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -333,7 +333,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": Int32(42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -344,7 +344,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": Int64(42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -355,7 +355,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": Double(42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -366,7 +366,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": Double128(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) /* No idea if this is a valid Double128... */)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -377,7 +377,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": Date(timeIntervalSince1970: 42)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -388,7 +388,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": try! CPRegularExpression(pattern: ".*", options: [])]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -399,7 +399,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": ["abc": "def"]]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -410,7 +410,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": ["abc", "def"]]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -421,7 +421,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": MongoTimestamp(incrementData: Data([0, 1, 2, 3]), timestampData: Data([4, 5, 6, 7]))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -432,7 +432,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": MongoBinary(binaryTypeAsInt: MongoBinary.BinarySubtype.genericBinary.rawValue, data: Data([0, 1, 2, 3, 4, 5]))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -443,7 +443,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": MongoObjectId(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -454,7 +454,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": Javascript(javascript: "console.log(\"hello world\");" /* Not sure if valid JS, but we do not care... */)]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -465,7 +465,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": JavascriptWithScope(javascript: "console.log(\"hello world\");", scope: ["abc": "def"])]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -476,7 +476,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": MinKey()]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -487,7 +487,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": MaxKey()]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -498,7 +498,7 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			let ref: BSONDoc = ["key": MongoDBPointer(stringPart: "StringPart!", bytesPartData: Data([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))]
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -510,7 +510,7 @@ class BSONSerializationTests: XCTestCase {
 			var ref: BSONDoc = [:]
 			for i in 0..<500 {ref[String(i)] = ["subkey!": String(repeating: ".", count: i)]}
 			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -521,8 +521,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeEmptyBSONUsingStream() {
 		do {
 			let ref: BSONDoc = [:]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -532,8 +532,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleOneEmptyKeyBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["": "def"]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -543,8 +543,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleOneEmptyValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["abc": ""]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -554,8 +554,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleOneEmptyKeyAndValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["": ""]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -565,8 +565,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleOneKeyBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["abc": "def"]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -576,8 +576,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleTwoKeysBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["abc": "def", "ghi": "jkl"]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -587,8 +587,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleNilValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": nil]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -598,8 +598,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleBoolValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": true]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -609,8 +609,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleIntValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": 42]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -620,8 +620,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleInt32ValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": Int32(42)]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -631,8 +631,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleInt64ValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": Int64(42)]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -642,8 +642,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleDouble64ValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": Double(42)]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -653,8 +653,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleDouble128ValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": Double128(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) /* No idea if this is a valid Double128... */)]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -664,8 +664,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleDateValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": Date(timeIntervalSince1970: 42)]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -675,8 +675,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleRegexValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": try! CPRegularExpression(pattern: ".*", options: [])]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -686,8 +686,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleEmbeddedDocValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": ["abc": "def"]]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -697,8 +697,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleArrayValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": ["abc", "def"]]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -708,8 +708,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleBSONTimeStampValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MongoTimestamp(incrementData: Data([0, 1, 2, 3]), timestampData: Data([4, 5, 6, 7]))]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -719,8 +719,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleBSONBinaryValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MongoBinary(binaryTypeAsInt: MongoBinary.BinarySubtype.genericBinary.rawValue, data: Data([0, 1, 2, 3, 4, 5]))]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -730,8 +730,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleBSONObjectIdValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MongoObjectId(data: (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -741,8 +741,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleJSValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": Javascript(javascript: "console.log(\"hello world\");" /* Not sure if valid JS, but we do not care... */)]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -752,8 +752,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleJSWithScopeValSimpleScopeBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": JavascriptWithScope(javascript: "console.log(\"hello world\");", scope: ["abc": "def"])]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -763,8 +763,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleMinKeyValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MinKey()]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -774,8 +774,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleMaxKeyValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MaxKey()]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -785,8 +785,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeSimpleMongoDBPointerKeyValBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["key": MongoDBPointer(stringPart: "StringPart!", bytesPartData: Data([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -796,8 +796,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeOneEmbeddedBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["1": ["subkey!": "."]]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -807,8 +807,8 @@ class BSONSerializationTests: XCTestCase {
 	func testEncodeDecodeTwoEmbeddedBSONUsingStream() {
 		do {
 			let ref: BSONDoc = ["1": ["subkey!": "."], "2": ["subkey!": ".."]]
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")
@@ -819,8 +819,8 @@ class BSONSerializationTests: XCTestCase {
 		do {
 			var ref: BSONDoc = [:]
 			for i in 0..<500 {ref[String(i)] = ["subkey!": String(repeating: ".", count: i)]}
-			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.write(BSONObject: ref, toStream: $0, options: []) })
-			let decoded = try BSONSerialization.BSONObject(data: encoded, options: [])
+			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
+			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
 		} catch {
 			XCTFail("\(error)")

@@ -12,28 +12,33 @@ import Foundation
 
 public typealias BSONDoc = [String: Any?]
 
-public struct BSONReadingOptions : OptionSet {
-	public let rawValue: Int
-	/* Empty. We just create the enum in case we want to add something to it later. */
-	
-	public init(rawValue v: Int) {
-		rawValue = v
-	}
-}
-
-
-public struct BSONWritingOptions : OptionSet {
-	public let rawValue: Int
-	
-	public static let skipSizes = BSONWritingOptions(rawValue: 1 << 0)
-	
-	public init(rawValue v: Int) {
-		rawValue = v
-	}
-}
-
 
 final public class BSONSerialization {
+	
+	public struct ReadingOptions : OptionSet {
+		
+		public let rawValue: Int
+		/* Empty. We just create the enum in case we want to add something to it later. */
+		
+		public init(rawValue v: Int) {
+			rawValue = v
+		}
+		
+	}
+	
+	public struct WritingOptions : OptionSet {
+		
+		public let rawValue: Int
+		
+		/** Set all sizes to 0 in generated BSON. Mainly useful internally for
+		optimization purposes. */
+		public static let skipSizes = WritingOptions(rawValue: 1 << 0)
+		
+		public init(rawValue v: Int) {
+			rawValue = v
+		}
+		
+	}
 	
 	/** The BSON Serialization errors enum. */
 	public enum BSONSerializationError : Error {
@@ -112,13 +117,13 @@ final public class BSONSerialization {
 	
 	- Parameter data: The data to parse. Must be exactly an entire BSON doc.
 	- Parameter options: Some options to customize the parsing. See
-	`BSONReadingOptions`.
+	`ReadingOptions`.
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	public class func BSONObject(data: Data, options opt: BSONReadingOptions) throws -> BSONDoc {
+	public class func bsonObject(with data: Data, options opt: ReadingOptions = []) throws -> BSONDoc {
 		let bufferedData = BufferedData(data: data)
-		return try BSONObject(bufferStream: bufferedData, options: opt)
+		return try bsonObject(with: bufferedData, options: opt)
 	}
 	
 	/**
@@ -129,19 +134,21 @@ final public class BSONSerialization {
 	than the size of the BSON doc is read. If the size of the BSON declared in
 	the stream is invalid, the read bytes count is undetermined.
 	
-	- Parameter stream: The stream to parse. Must already be opened and configured.
-	- Parameter options: Some options to customize the parsing. See `BSONReadingOptions`.
+	- Parameter stream: The stream to parse. Must already be opened and
+	configured.
+	- Parameter options: Some options to customize the parsing. See
+	`ReadingOptions`.
 	- Throws: `BSONSerializationError` in case of error.
 	- Returns: The serialized BSON data.
 	*/
-	public class func BSONObject(stream: InputStream, options opt: BSONReadingOptions) throws -> BSONDoc {
+	public class func bsonObject(with stream: InputStream, options opt: ReadingOptions = []) throws -> BSONDoc {
 		let bufferedInputStream = BufferedInputStream(stream: stream, bufferSize: 1024*1024, streamReadSizeLimit: nil)
-		return try BSONObject(bufferStream: bufferedInputStream, options: opt)
+		return try bsonObject(with: bufferedInputStream, options: opt)
 	}
 	
 	/* Note: Whenever we can, I'd like to have a non-escaping optional closure...
 	 * Other Note: decodeCallback is **NOT** called when a SUB-key is decoded. */
-	class func BSONObject(bufferStream: BufferStream, options opt: BSONReadingOptions, initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
+	class func bsonObject(with bufferStream: BufferStream, options opt: ReadingOptions = [], initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
@@ -238,14 +245,14 @@ final public class BSONSerialization {
 				ret[key] = val
 				
 			case .dictionary?:
-				let val = try BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
+				let val = try bsonObject(with: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
 				try decodeCallback(key, val)
 				ret[key] = val
 				
 			case .array?:
 				var val = [Any?]()
 				var prevKey: String? = nil
-				_ = try BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition, decodeCallback: { subkey, subval in
+				_ = try bsonObject(with: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition, decodeCallback: { subkey, subval in
 					guard String(val.count) == subkey else {throw BSONSerializationError.invalidArrayKey(currentKey: subkey, previousKey: prevKey)}
 					val.append(subval)
 					prevKey = subkey
@@ -285,7 +292,7 @@ final public class BSONSerialization {
 				
 				let valSize: Int32 = try bufferStream.readType()
 				let jsCode = try bufferStream.readBSONString(encoding: .utf8)
-				let scope = try BSONSerialization.BSONObject(bufferStream: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
+				let scope = try bsonObject(with: bufferStream, options: opt, initialReadPosition: bufferStream.currentReadPosition)
 				guard bufferStream.currentReadPosition - valStartPosition == Int(valSize) else {throw BSONSerializationError.invalidJSWithScopeLength(expected: Int(valSize), actual: bufferStream.currentReadPosition - valStartPosition)}
 				let val = JavascriptWithScope(javascript: jsCode, scope: scope)
 				try decodeCallback(key, val)
@@ -325,7 +332,7 @@ final public class BSONSerialization {
 		return ret
 	}
 	
-	public class func data(withBSONObject BSONObject: BSONDoc, options opt: BSONWritingOptions) throws -> Data {
+	public class func data(withBSONObject BSONObject: BSONDoc, options opt: WritingOptions = []) throws -> Data {
 		let stream = OutputStream(toMemory: ())
 		
 		stream.open()
@@ -356,7 +363,7 @@ final public class BSONSerialization {
 	/** Write the given BSON object to a write stream.
 	
 	- Returns: The number of bytes written. */
-	public class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions) throws -> Int {
+	public class func writeBSONObject(_ BSONObject: BSONDoc, to stream: OutputStream, options opt: WritingOptions = []) throws -> Int {
 		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: {_,_ in})
 	}
 	
@@ -539,7 +546,7 @@ final public class BSONSerialization {
 	
 	- Note: When possible, `sizeFoundCallback` should be optional (cannot be a
 	non-escaped closure in current Swift state). */
-	private class func write(BSONEntity entity: Any?, withKey key: String, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int, sizes: UnsafeMutablePointer<[Int]>?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
+	private class func write(BSONEntity entity: Any?, withKey key: String, toStream stream: OutputStream, options opt: WritingOptions, initialWritePosition: Int, sizes: UnsafeMutablePointer<[Int]>?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void = {_,_ in}) throws -> Int {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		var size = 0
@@ -706,7 +713,7 @@ final public class BSONSerialization {
 	
 	- Parameter sizeFoundCallback: Only called when options contain `.skipSizes`.
 	- Returns: The number of bytes written. */
-	private class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: BSONWritingOptions, initialWritePosition: Int, sizes knownSizes: UnsafeMutablePointer<[Int]>?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void) throws -> Int {
+	private class func write(BSONObject: BSONDoc, toStream stream: OutputStream, options opt: WritingOptions, initialWritePosition: Int, sizes knownSizes: UnsafeMutablePointer<[Int]>?, sizeFoundCallback: (_ offset: Int, _ size: Int32) -> Void) throws -> Int {
 		let skipSizes = opt.contains(.skipSizes)
 		
 		var zero: Int8 = 0

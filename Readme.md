@@ -29,8 +29,8 @@ Example of use:
 ```swift
 let myFirstBSONDoc = ["key": "value"]
 let serializedBSONDoc = try BSONSerialization.data(withBSONObject: myFirstBSONDoc, options: [])
-let unserializedBSONDoc = try BSONSerialization.BSONObject(data: serializedBSONDoc, options: [])
-areBSONDocEqual(myFirstBSONDoc, unserializedBSONDoc) /* Returns true */
+let unserializedBSONDoc = try BSONSerialization.bsonObject(with: serializedBSONDoc, options: [])
+try areBSONDocEqual(myFirstBSONDoc, unserializedBSONDoc) /* Returns true */
 ```
 
 Serializing/deserializing to/from a stream is also supported. (Note: Due to the
