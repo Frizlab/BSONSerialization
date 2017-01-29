@@ -165,7 +165,11 @@ internal extension BufferStream {
 	
 	func readType<Type>() throws -> Type {
 		let data = try readData(size: MemoryLayout<Type>.size, alwaysCopyBytes: false)
-		return data.withUnsafeBytes {(_ bytes: UnsafePointer<UInt8>) -> Type in unsafeBitCast(bytes, to: UnsafePointer<Type>.self).pointee}
+		return data.withUnsafeBytes { (_ bytes: UnsafePointer<UInt8>) -> Type in
+			return bytes.withMemoryRebound(to: Type.self, capacity: 1) { pointer -> Type in
+				return pointer.pointee
+			}
+		}
 	}
 	
 }
@@ -442,7 +446,7 @@ internal class BufferedData : BufferStream {
 		var matchedDatas = [(delimiterIdx: Int, dataLength: Int)]()
 		
 		return try sourceData.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Data in
-			let searchedData = Data(bytesNoCopy: unsafeBitCast(bytes, to: UnsafeMutablePointer<UInt8>.self).advanced(by: currentReadPosition), count: sourceDataSize-currentReadPosition, deallocator: .none)
+			let searchedData = Data(bytesNoCopy: UnsafeMutablePointer<UInt8>(mutating: bytes).advanced(by: currentReadPosition), count: sourceDataSize-currentReadPosition, deallocator: .none)
 			if let returnedLength = matchDelimiters(inData: searchedData, usingMatchingMode: matchingMode, includeDelimiter: includeDelimiter, minDelimiterLength: minDelimiterLength, withUnmatchedDelimiters: &unmatchedDelimiters, matchedDatas: &matchedDatas) {
 				return getNextSubData(size: returnedLength, alwaysCopyBytes: alwaysCopyBytes)
 			}
@@ -463,7 +467,7 @@ internal class BufferedData : BufferStream {
 		else               {return sourceData.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Data in
 			/* Not sure if the unsafeBitCast below is so safe... It should be
 			 * because we'll never modify the data object. */
-			return Data(bytesNoCopy: unsafeBitCast(bytes, to: UnsafeMutablePointer<UInt8>.self).advanced(by: range.lowerBound), count: size, deallocator: .none)
+			return Data(bytesNoCopy: UnsafeMutablePointer<UInt8>(mutating: bytes).advanced(by: range.lowerBound), count: size, deallocator: .none)
 		}}
 	}
 	

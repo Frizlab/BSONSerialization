@@ -352,7 +352,9 @@ final public class BSONSerialization {
 		if !opt.contains(.skipSizes) {
 			data.withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in
 				for (offset, size) in sizes {
-					unsafeBitCast(bytes.advanced(by: offset), to: UnsafeMutablePointer<Int32>.self).pointee = size
+					bytes.advanced(by: offset).withMemoryRebound(to: Int32.self, capacity: 1) { (pointer: UnsafeMutablePointer<Int32>) -> Void in
+						pointer.pointee = size
+					}
 				}
 			}
 		}
@@ -812,13 +814,15 @@ final public class BSONSerialization {
 	}
 	
 	private class func write<T>(value: inout T, toStream stream: OutputStream) throws -> Int {
+		let size = MemoryLayout<T>.size
+		guard size > 0 else {return 0} /* Less than probable that size is equal to zero... */
+		
 		return try withUnsafePointer(to: &value) { pointer -> Int in
-			let size = MemoryLayout<T>.size
-			guard size > 0 else {return 0} /* Less than probable that size is equal to zero... */
-			
-			let writtenSize = stream.write(unsafeBitCast(pointer, to: UnsafePointer<UInt8>.self), maxLength: size)
-			guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-			return size
+			return try pointer.withMemoryRebound(to: UInt8.self, capacity: size, { bytes -> Int in
+				let writtenSize = stream.write(bytes, maxLength: size)
+				guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
+				return size
+			})
 		}
 	}
 	
