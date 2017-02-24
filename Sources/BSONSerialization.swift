@@ -793,7 +793,7 @@ final public class BSONSerialization {
 	
 	private class func write(BSONEncodedString str: String, toStream stream: OutputStream) throws -> Int {
 		var written = 0
-		var strLength: Int32 = str.utf8.count + 1 /* The zero */
+		var strLength = Int32(str.utf8.count + 1 /* The zero */)
 		
 		/* Let's write the size of the string to the stream */
 		written += try write(value: &strLength, toStream: stream)
@@ -874,7 +874,7 @@ private extension BufferStream {
 		
 		/* Reading the actual string. */
 		let data = try readData(size: Int(stringSize)-1, alwaysCopyBytes: false)
-		assert(data.count == stringSize-1)
+		assert(data.count == Int(stringSize-1))
 		guard let str = String(data: data, encoding: encoding) else {
 			/* MUST copy the data as the original bytes are not owned by us. */
 			let dataCopy = Data(bytes: Array(data))
