@@ -9,16 +9,6 @@
 import Foundation
 
 
-/* Defining CPRegularExpression: CrossPlatform RegularExpression
- * For the time being, macOS and Linux version of Swift do not have the same
- * class name to represent a regular expression, though the class is basically
- * the same. */
-#if os(Linux)
-	public typealias CPRegularExpression = RegularExpression
-#else
-	public typealias CPRegularExpression = NSRegularExpression
-#endif
-
 
 public struct Double128 : Equatable /*, AbsoluteValuable, BinaryFloatingPoint, ExpressibleByIntegerLiteral, Hashable, LosslessStringConvertible, CustomDebugStringConvertible, CustomStringConvertible, Strideable*/ {
 	
@@ -247,8 +237,8 @@ private func areBSONEntitiesEqual(_ entity1: Any?, _ entity2: Any?) throws -> Bo
 	case let val as Double128: guard entity2 as? Double128 == val else {return false}
 	case let val as Date:      guard entity2 as? Date      == val else {return false}
 	case let str as String:    guard entity2 as? String    == str else {return false}
-	case let regexp1 as CPRegularExpression:
-		guard let regexp2 = entity2 as? CPRegularExpression else {return false}
+	case let regexp1 as NSRegularExpression:
+		guard let regexp2 = entity2 as? NSRegularExpression else {return false}
 		guard regexp1.pattern == regexp2.pattern && regexp1.options == regexp2.options else {return false}
 		
 	case let subObj1 as BSONDoc:

@@ -220,7 +220,7 @@ final public class BSONSerialization {
 			case .regularExpression?:
 				let pattern = try bufferStream.readCString(encoding: .utf8)
 				let options = try bufferStream.readCString(encoding: .utf8)
-				var foundationOptions: CPRegularExpression.Options = [.anchorsMatchLines]
+				var foundationOptions: NSRegularExpression.Options = [.anchorsMatchLines]
 				for c in options.characters {
 					switch c {
 					case "i": foundationOptions.insert(.caseInsensitive) /* Case insensitive matching */
@@ -232,8 +232,8 @@ final public class BSONSerialization {
 					default: throw BSONSerializationError.invalidRegularExpressionOptions(options: options, invalidCharacter: c)
 					}
 				}
-				let val: CPRegularExpression
-				do    {val = try CPRegularExpression(pattern: pattern, options: foundationOptions)}
+				let val: NSRegularExpression
+				do    {val = try NSRegularExpression(pattern: pattern, options: foundationOptions)}
 				catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
 				
 				try decodeCallback(key, val)
@@ -486,7 +486,7 @@ final public class BSONSerialization {
 		case _ as Double128:                   size += 16 /* 128 bits is 16 bytes */
 		case _ as Date:                        size += 8  /* Encoded as an Int64 */
 			
-		case let regexp as CPRegularExpression:
+		case let regexp as NSRegularExpression:
 			size += regexp.pattern.utf8.count + 1
 			size += bsonRegexpOptionsString(fromFoundationRegexp: regexp).utf8.count + 1
 			
@@ -602,7 +602,7 @@ final public class BSONSerialization {
 			var timestamp = Int64(val.timeIntervalSince1970)
 			size += try write(value: &timestamp, toStream: stream)
 			
-		case let regexp as CPRegularExpression:
+		case let regexp as NSRegularExpression:
 			size += try write(elementType: .regularExpression, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
 			size += try write(CEncodedString: regexp.pattern, toStream: stream)
@@ -831,7 +831,7 @@ final public class BSONSerialization {
 		return try write(value: &t, toStream: stream)
 	}
 	
-	private class func bsonRegexpOptionsString(fromFoundationRegexp foundationRegexp: CPRegularExpression) -> String {
+	private class func bsonRegexpOptionsString(fromFoundationRegexp foundationRegexp: NSRegularExpression) -> String {
 		var result = ""
 		
 		let opt = foundationRegexp.options
