@@ -220,7 +220,8 @@ internal class BufferedInputStream : BufferStream {
 	}
 	
 	deinit {
-		buffer.deallocate(capacity: bufferSize)
+		if buffer != defaultSizedBuffer {buffer.deallocate(capacity: bufferSize)}
+		defaultSizedBuffer.deallocate(capacity: defaultBufferSize)
 	}
 	
 	func readData(size: Int, alwaysCopyBytes: Bool) throws -> Data {
