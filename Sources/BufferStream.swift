@@ -329,9 +329,10 @@ internal class BufferedInputStream : BufferStream {
 		var searchOffset = 0
 		repeat {
 			assert(bufferValidLength - searchOffset >= 0)
-			let bufferStart = buffer.advanced(by: bufferStartPos)
+			var bufferStart = buffer.advanced(by: bufferStartPos)
 			let bufferSearchData = Data(bytesNoCopy: bufferStart.advanced(by: searchOffset), count: bufferValidLength - searchOffset, deallocator: .none)
-			if let returnedLength = matchDelimiters(inData: bufferSearchData, usingMatchingMode: matchingMode, includeDelimiter: includeDelimiter, minDelimiterLength: minDelimiterLength, withUnmatchedDelimiters: &unmatchedDelimiters, matchedDatas: &matchedDatas) {
+			if let matchedLength = matchDelimiters(inData: bufferSearchData, usingMatchingMode: matchingMode, includeDelimiter: includeDelimiter, minDelimiterLength: minDelimiterLength, withUnmatchedDelimiters: &unmatchedDelimiters, matchedDatas: &matchedDatas) {
+				let returnedLength = searchOffset + matchedLength
 				bufferStartPos += returnedLength
 				bufferValidLength -= returnedLength
 				currentReadPosition += returnedLength
@@ -347,7 +348,7 @@ internal class BufferedInputStream : BufferStream {
 				if bufferStartPos > 0 {
 					/* We can move the data to the beginning of the buffer. */
 					assert(bufferStart != buffer)
-					buffer.assign(from: bufferStart, count: bufferValidLength); bufferStartPos = 0
+					buffer.assign(from: bufferStart, count: bufferValidLength); bufferStartPos = 0; bufferStart = buffer
 				} else {
 					/* The buffer is not big enough anymore. We need to create a new,
 					 * bigger one. */
@@ -360,6 +361,7 @@ internal class BufferedInputStream : BufferStream {
 					buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
 //					if buffer == nil {throw BufferStreamError.cannotAllocateMemory(size)}
 					buffer.assign(from: bufferStart, count: bufferValidLength)
+					bufferStart = buffer
 					
 					if oldBuffer != defaultSizedBuffer {oldBuffer.deallocate(capacity: oldBufferSize)}
 				}
