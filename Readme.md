@@ -1,9 +1,9 @@
 # BSONSerialization
-BSON Serialization in native Swift 3
+BSON Serialization in native Swift 4
 
 ## Installation & Compatibility
 The recommended (and only tested) way to install and use BSONSerialization is
-via `SwiftPM`.
+via `SwiftPM`, using at least Swift 4.
 
 The content of your `Package.swift` should be something resembling:
 ```swift
@@ -11,16 +11,9 @@ import PackageDescription
 
 let package = Package(
 	name: "toto",
-	dependencies: [.Package(url: "https://github.com/Frizlab/BSONSerialization.git", majorVersion: 0, minorVersion: 9)]
+	dependencies: [.package(url: "https://github.com/Frizlab/BSONSerialization.git", from: "1.0.2")]
 )
 ```
-
-Note: This repository also comes with an xcodeproj file. The Xcode project has
-been configured to create a macOS Framework when archived. Though untested, the
-framework should be usable as-is in any “pure Swift” macOS application. For Objc
-projects, there’s probably some more work to do for the headers to be correct…
-Finally, for iOS application, creating a target to have an iOS compatible
-framework should be easy to do. Pull requests are welcome 😉
 
 ## Usage
 `BSONSerialization` has the same basic interface than `JSONSerialization`.
