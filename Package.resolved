@@ -1,0 +1,16 @@
+{
+  "object": {
+    "pins": [
+      {
+        "package": "SimpleStream",
+        "repositoryURL": "https://github.com/Frizlab/SimpleStream",
+        "state": {
+          "branch": null,
+          "revision": "026916c6e79e6002f042b7e75f754861ad14f38f",
+          "version": "1.0.0"
+        }
+      }
+    ]
+  },
+  "version": 1
+}
