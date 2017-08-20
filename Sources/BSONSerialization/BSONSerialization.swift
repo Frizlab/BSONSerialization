@@ -387,7 +387,7 @@ final public class BSONSerialization {
 		return sizes
 	}
 	
-	class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
+	public class func isValidBSONObject(_ obj: BSONDoc) -> Bool {
 		return (try? sizesOfBSONObject(obj)) != nil
 	}
 	
