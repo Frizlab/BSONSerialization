@@ -120,6 +120,16 @@ final public class BSONSerialization {
 	- Returns: The serialized BSON data.
 	*/
 	public class func bsonObject(with data: Data, options opt: ReadingOptions = []) throws -> BSONDoc {
+		/* Let's check whether the length of the data correspond to the length
+		 * declared in the data. */
+		guard data.count >= 5 else {throw BSONSerializationError.dataTooSmall}
+		let length32 = data.withUnsafeBytes{ (_ bytes: UnsafePointer<UInt8>) -> Int32 in
+			return bytes.withMemoryRebound(to: Int32.self, capacity: 1){ pointer -> Int32 in
+				return pointer.pointee
+			}
+		}
+		guard Int(length32) == data.count else {throw BSONSerializationError.dataLengthDoNotMatch}
+		
 		let bufferedData = SimpleDataStream(data: data)
 		return try bsonObject(with: bufferedData, options: opt)
 	}

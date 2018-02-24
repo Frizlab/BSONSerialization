@@ -6,6 +6,7 @@ var tests: [XCTestCaseEntry] = [
 	testCase([
 	]),
 	testCase([
+		("testGarbageAtEndThrows", BSONSerializationTests.testGarbageAtEndThrows),
 		("testDecodeEmptyBSONFromData", BSONSerializationTests.testDecodeEmptyBSONFromData),
 		("testDecodeKeyAbcValDefFromData", BSONSerializationTests.testDecodeKeyAbcValDefFromData),
 		("testSimpleEmbeddedDocFromData", BSONSerializationTests.testSimpleEmbeddedDocFromData),
@@ -83,10 +84,6 @@ var tests: [XCTestCaseEntry] = [
 		("testIsValidBSONDoc3", BSONSerializationTests.testIsValidBSONDoc3),
 		("testIsInvalidBSONDoc1", BSONSerializationTests.testIsInvalidBSONDoc1),
 		("testIsInvalidBSONDoc2", BSONSerializationTests.testIsInvalidBSONDoc2),
-	]),
-	testCase([
-		("testReadSmallerThanBufferData", BufferedInputStreamTests.testReadSmallerThanBufferData),
-		("testReadBiggerThanBufferData", BufferedInputStreamTests.testReadBiggerThanBufferData),
 	]),
 	testCase([
 	]),

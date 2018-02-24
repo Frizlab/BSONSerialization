@@ -26,6 +26,11 @@ class BSONSerializationTests: XCTestCase {
 		super.tearDown()
 	}
 	
+	func testGarbageAtEndThrows() {
+		let data = Data(hexEncoded: "05 00 00 00 00 00")!
+		XCTAssertThrowsError(try BSONSerialization.bsonObject(with: data, options: []))
+	}
+	
 	func testDecodeEmptyBSONFromData() {
 		do {
 			let data = Data(hexEncoded: "05 00 00 00 00")!
