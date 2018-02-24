@@ -48,9 +48,6 @@ final public class BSONSerialization {
 		/** The given data size is not the one declared by the bson doc. */
 		case dataLengthDoNotMatch
 		
-		/** The stream ended before the end of the bson doc was reached. */
-		case earlyStreamEnding
-		
 		/** The length of the bson doc is invalid. */
 		case invalidLength
 		/** An invalid element was found. The element is given in argument to this
@@ -222,7 +219,7 @@ final public class BSONSerialization {
 				let pattern = try bufferStream.readCString(encoding: .utf8)
 				let options = try bufferStream.readCString(encoding: .utf8)
 				var foundationOptions: NSRegularExpression.Options = [.anchorsMatchLines]
-				for c in options.characters {
+				for c in options {
 					switch c {
 					case "i": foundationOptions.insert(.caseInsensitive) /* Case insensitive matching */
 					case "m": foundationOptions.remove(.anchorsMatchLines) /* Multiline matching. Not sure if what we've set corresponds exactly to the MongoDB implementation's... */
@@ -351,9 +348,9 @@ final public class BSONSerialization {
 		
 		var data = Data(referencing: nsdata)
 		if !opt.contains(.skipSizes) {
-			data.withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt8>) -> Void in
+			data.withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt8>) -> Void in
 				for (offset, size) in sizes {
-					bytes.advanced(by: offset).withMemoryRebound(to: Int32.self, capacity: 1) { (pointer: UnsafeMutablePointer<Int32>) -> Void in
+					bytes.advanced(by: offset).withMemoryRebound(to: Int32.self, capacity: 1){ (pointer: UnsafeMutablePointer<Int32>) -> Void in
 						pointer.pointee = size
 					}
 				}
@@ -545,7 +542,7 @@ final public class BSONSerialization {
 	/** Writes the given entity to the stream.
 	
 	- Note: The .skipSizes option is ignored (determined by whether the sizes
-	argument is `nil`.
+	argument is `nil`).
 	
 	- Note: When possible, `sizeFoundCallback` should be optional (cannot be a
 	non-escaped closure in current Swift state). */
@@ -659,7 +656,7 @@ final public class BSONSerialization {
 			
 			/* Writing a 0-length data seems to make next writes to the stream fail */
 			if bin.data.count > 0 {
-				let written = bin.data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Int in return stream.write(bytes, maxLength: bin.data.count) }
+				let written = bin.data.withUnsafeBytes{ (bytes: UnsafePointer<UInt8>) -> Int in return stream.write(bytes, maxLength: bin.data.count) }
 				guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 				size += written
 			}
@@ -760,7 +757,7 @@ final public class BSONSerialization {
 		currentRelativeWritePosition += try write(value: &zero, toStream: stream)
 		
 		/* If skipping sizes, we have to call the callback for size found (the doc
-		 * is written entirely, we now know its size! */
+		 * is written entirely, we now know its size!) */
 		if skipSizes {sizeFoundCallback(initialWritePosition, Int32(currentRelativeWritePosition))}
 		
 		if allocatedPointer, let sizesPointer = sizesPointer {
@@ -776,12 +773,12 @@ final public class BSONSerialization {
 		var written = 0
 		
 		/* Apparently writing 0 bytes to the stream will f**ck it up... */
-		if str.characters.count > 0 {
+		if str.count > 0 {
 			/* Let's get the UTF8 bytes of the string. */
 			let bytes = [UInt8](str.utf8)
 			guard !bytes.contains(0) else {throw BSONSerializationError.unserializableCString(str)}
 			
-			let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
 			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 			written += curWrite
 		}
@@ -800,10 +797,10 @@ final public class BSONSerialization {
 		written += try write(value: &strLength, toStream: stream)
 		
 		/* Apparently writing 0 bytes to the stream will f**ck it up... */
-		if str.characters.count > 0 {
+		if str.count > 0 {
 			/* Let's get the UTF8 bytes of the string. */
 			let bytes = [UInt8](str.utf8)
-			let curWrite = bytes.withUnsafeBufferPointer { p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
 			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 			written += curWrite
 		}
@@ -818,7 +815,7 @@ final public class BSONSerialization {
 		let size = MemoryLayout<T>.size
 		guard size > 0 else {return 0} /* Less than probable that size is equal to zero... */
 		
-		return try withUnsafePointer(to: &value) { pointer -> Int in
+		return try withUnsafePointer(to: &value){ pointer -> Int in
 			return try pointer.withMemoryRebound(to: UInt8.self, capacity: size, { bytes -> Int in
 				let writtenSize = stream.write(bytes, maxLength: size)
 				guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
@@ -862,8 +859,7 @@ private extension SimpleStream {
 		/* This String init fails if the data is invalid for the given encoding. */
 		guard let str = String(data: data, encoding: encoding) else {
 			/* MUST copy the data as the original bytes are not owned by us. */
-			let dataCopy = Data(bytes: Array(data))
-			throw BSONSerialization.BSONSerializationError.invalidString(dataCopy)
+			throw BSONSerialization.BSONSerializationError.invalidString(Data(data))
 		}
 		
 		return str
@@ -878,8 +874,7 @@ private extension SimpleStream {
 		assert(data.count == Int(stringSize-1))
 		guard let str = String(data: data, encoding: encoding) else {
 			/* MUST copy the data as the original bytes are not owned by us. */
-			let dataCopy = Data(bytes: Array(data))
-			throw BSONSerialization.BSONSerializationError.invalidString(dataCopy)
+			throw BSONSerialization.BSONSerializationError.invalidString(Data(data))
 		}
 		
 		/* Reading the last byte and checking it is indeed 0. */
