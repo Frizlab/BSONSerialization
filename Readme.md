@@ -52,11 +52,11 @@ I used the BSON specification version 1.1 from http://bsonspec.org/spec.html
 
 All types in this specification, including deprecated ones are supported.
 
-## To do
-- Allow direct serialization of `Data` object instead of having to use the
+## To Do
+- [ ] Allow direct serialization of `Data` object instead of having to use the
 `MongoBinary` type
-- Allow serializing Int64 or Int32 to Int directly, depending on the platform
-- Xcode target for an iOS Framework
+- [ ] Allow serializing Int64 or Int32 to Int directly, depending on the platform
+- [ ] Xcode target for an iOS Framework
 
 I’ll work seriously on the project if it gains enough attention. Feel free to
 open issues, I’ll do my best to answer.
