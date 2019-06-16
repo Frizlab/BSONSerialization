@@ -742,7 +742,7 @@ final public class BSONSerialization {
 			} else {
 				allocatedPointer = true
 				nonNilSizesPointer = UnsafeMutablePointer<[Int]>.allocate(capacity: 1)
-				nonNilSizesPointer.initialize(to: try sizesOfBSONObject(BSONObject), count: 1)
+				nonNilSizesPointer.initialize(repeating: try sizesOfBSONObject(BSONObject), count: 1)
 			}
 			docSize = Int32(nonNilSizesPointer.pointee.popLast()!/* If nil, this is an internal error */)
 			sizesPointer = nonNilSizesPointer
@@ -772,7 +772,7 @@ final public class BSONSerialization {
 		
 		if allocatedPointer, let sizesPointer = sizesPointer {
 			sizesPointer.deinitialize(count: 1)
-			sizesPointer.deallocate(capacity: 1)
+			sizesPointer.deallocate()
 		}
 		
 		/* The current write position is indeed the number of bytes written... */

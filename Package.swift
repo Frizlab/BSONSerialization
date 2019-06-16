@@ -1,25 +1,18 @@
-// swift-tools-version:4.0
+// swift-tools-version:4.2
 import PackageDescription
+
+
 
 let package = Package(
 	name: "BSONSerialization",
 	products: [
-		.library(
-			name: "BSONSerialization",
-			targets: ["BSONSerialization"]
-		)
+		.library(name: "BSONSerialization", targets: ["BSONSerialization"])
 	],
 	dependencies: [
-		.package(url: "https://github.com/Frizlab/SimpleStream", from: "1.0.0"),
+		.package(url: "https://github.com/Frizlab/SimpleStream", from: "1.0.2"),
 	],
 	targets: [
-		.target(
-			name: "BSONSerialization",
-			dependencies: ["SimpleStream"]
-		),
-		.testTarget(
-			name: "BSONSerializationTests",
-			dependencies: ["BSONSerialization"]
-		)
+		.target(name: "BSONSerialization", dependencies: ["SimpleStream"]),
+		.testTarget(name: "BSONSerializationTests", dependencies: ["BSONSerialization"])
 	]
 )
