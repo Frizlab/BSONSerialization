@@ -354,20 +354,27 @@ final public class BSONSerialization {
 		
 		var data = Data(referencing: nsdata)
 		if !opt.contains(.skipSizes) {
-			/* This method should be valid (in regard to the memory binding)
-			 * because we know the data won’t be aliased as we will modify and
-			 * access it in this method only.
-			 * More info: https://twitter.com/jckarter/status/1142446184700624896 */
 			data.withUnsafeMutableBytes{ (bytes: UnsafeMutableRawBufferPointer) -> Void in
 				let baseAddress = bytes.baseAddress!
 				for (offset, size) in sizes {
 					/* We can either bind the memory, or assume it’s already bound,
-					 * it does not matter in our case in theory.
-					 * I prefer to assume the bind as we’re discarding the pointer
-					 * just after modifying the memory, I’m not sure there’s a point
-					 * in binding the memory.
-					 * Disclaimer: My logic can be flawed… */
-					(baseAddress + offset).assumingMemoryBound(to: type(of: size)).pointee = size
+					 * both cases are “working” (well the tests pass). Justification:
+					 * we know the data won’t be aliased as we will modify and access
+					 * it in this method only.
+					 * I prefer to bind as the doc says “Any typed memory access,
+					 * either via a normal safe language construct or via ${Self}<T>,
+					 * requires that the access type be compatible with the memory’s
+					 * currently ‘bound’ type.” Otherwise it’s an undefined behavior.
+					 * https://github.com/atrick/swift/blob/type-safe-mem-docs/docs/TypeSafeMemory.rst#introduction
+					 * For a trivial type I don’t think it matters, but still, let’s
+					 * do the things “the right way.” */
+					(baseAddress + offset).bindMemory(to: type(of: size), capacity: 1).pointee = size
+					/* Note: Ideally I’d love to be able to do the line below, but
+					 * currently it can crash with “storeBytes to misaligned raw
+					 * pointer” (which is expected as per the documentation).
+					 * Joe said there should be a version of storeBytes in the stdlib
+					 * able to store at unaligned locations, but it is not there yet.*/
+//					(baseAddress + offset).storeBytes(of: size, as: type(of: size))
 				}
 			}
 			/* A variant of the code above. While this variant is “safer” because
@@ -683,12 +690,9 @@ final public class BSONSerialization {
 				 * the closure, and thus cannot be aliased.
 				 * https://twitter.com/jckarter/status/1142446184700624896 */
 				let written = bin.data.withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in
-					/* We can bind or assume the bind. I prefer to assume the bind
-					 * here: we do not modify the memory in any way, we’re just
-					 * reading it in an unmutable state and discard the pointer just
-					 * next. What would be the point of binding the memory?
-					 * Disclaimer: My logic can be flawed… */
-					return stream.write(bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), maxLength: bytes.count)
+					let boundBytes = bytes.bindMemory(to: UInt8.self)
+					assert(bin.data.count == boundBytes.count, "INTERNAL ERROR")
+					return stream.write(boundBytes.baseAddress!, maxLength: boundBytes.count)
 				}
 				guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 				size += written
