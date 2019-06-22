@@ -123,11 +123,7 @@ final public class BSONSerialization {
 		/* Let's check whether the length of the data correspond to the length
 		 * declared in the data. */
 		guard data.count >= 5 else {throw BSONSerializationError.dataTooSmall}
-		let length32 = data.withUnsafeBytes{ (_ bytes: UnsafePointer<UInt8>) -> Int32 in
-			return bytes.withMemoryRebound(to: Int32.self, capacity: 1){ pointer -> Int32 in
-				return pointer.pointee
-			}
-		}
+		let length32 = data.withUnsafeBytes{ $0.load(as: Int32.self) }
 		guard Int(length32) == data.count else {throw BSONSerializationError.dataLengthDoNotMatch}
 		
 		let bufferedData = SimpleDataStream(data: data)
@@ -358,13 +354,22 @@ final public class BSONSerialization {
 		
 		var data = Data(referencing: nsdata)
 		if !opt.contains(.skipSizes) {
-			data.withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt8>) -> Void in
-				for (offset, size) in sizes {
-					bytes.advanced(by: offset).withMemoryRebound(to: Int32.self, capacity: 1){ (pointer: UnsafeMutablePointer<Int32>) -> Void in
-						pointer.pointee = size
-					}
-				}
+			let int32Size = MemoryLayout<Int32>.size
+			for (offset, var size) in sizes {
+				let sizeData = Data(bytes: &size, count: int32Size)
+				data[offset..<(offset + int32Size)] = sizeData
 			}
+			/* Below is a possible variant for the above code. Note I’m not sure
+			 * the variant is sematically valid. We bind the underlying bytes of
+			 * the data object, and do not unbind them later, nor make sure they
+			 * were not bound before! For a Data referencing an NSData especially,
+			 * I have no idea what state the memory we get is in… */
+//			data.withUnsafeMutableBytes{ (bytes: UnsafeMutableRawBufferPointer) -> Void in
+//				let baseAddress = bytes.baseAddress!
+//				for (offset, size) in sizes {
+//					(baseAddress + offset).bindMemory(to: Int32.self, capacity: 1).pointee = size
+//				}
+//			}
 		}
 		
 		return data
@@ -666,7 +671,13 @@ final public class BSONSerialization {
 			
 			/* Writing a 0-length data seems to make next writes to the stream fail */
 			if bin.data.count > 0 {
-				let written = bin.data.withUnsafeBytes{ (bytes: UnsafePointer<UInt8>) -> Int in return stream.write(bytes, maxLength: bin.data.count) }
+				/* Note: We don’t know in which state the memory we’re given is (is
+				 * it unbound, uninitialized, etc.) The write to stream method
+				 * expects an UnsafePointer<UInt8>, that is a pointer to a memory
+				 * bound to UInt8. We thus have to (re-)bind the memory of the data
+				 * to UInt8. Because we don’t know the state of the previous memory,
+				 * we have to make a _copy_ of the data to be able to bind it… */
+				let written = Data(bin.data).withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in return stream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count) }
 				guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 				size += written
 			}
@@ -863,7 +874,7 @@ final public class BSONSerialization {
 private extension SimpleStream {
 	
 	func readCString(encoding: String.Encoding) throws -> String {
-		let data = try readData(upToDelimiters: [Data(bytes: [0])], matchingMode: .anyMatchWins, includeDelimiter: false, alwaysCopyBytes: false)
+		let data = try readData(upToDelimiters: [Data([0])], matchingMode: .anyMatchWins, includeDelimiter: false, alwaysCopyBytes: false)
 		_ = try readData(size: 1, alwaysCopyBytes: false)
 		
 		/* This String init fails if the data is invalid for the given encoding. */

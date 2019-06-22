@@ -47,7 +47,7 @@ extension Data {
 			default: return nil
 			}
 		}
-		self.init(bytes: bytes)
+		self.init(bytes)
 	}
 	
 	func hexEncodedString(withSpaces: Bool = true) -> String {
