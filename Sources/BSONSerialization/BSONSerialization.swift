@@ -361,7 +361,13 @@ final public class BSONSerialization {
 			data.withUnsafeMutableBytes{ (bytes: UnsafeMutableRawBufferPointer) -> Void in
 				let baseAddress = bytes.baseAddress!
 				for (offset, size) in sizes {
-					(baseAddress + offset).bindMemory(to: Int32.self, capacity: 1).pointee = size
+					/* We can either bind the memory, or assume it’s already bound,
+					 * it does not matter in our case in theory.
+					 * I prefer to assume the bind as we’re discarding the pointer
+					 * just after modifying the memory, I’m not sure there’s a point
+					 * in binding the memory.
+					 * Disclaimer: My logic can be flawed… */
+					(baseAddress + offset).assumingMemoryBound(to: type(of: size)).pointee = size
 				}
 			}
 			/* A variant of the code above. While this variant is “safer” because
@@ -676,7 +682,14 @@ final public class BSONSerialization {
 				 * already bound) to UInt8 because the memory will be immutable in
 				 * the closure, and thus cannot be aliased.
 				 * https://twitter.com/jckarter/status/1142446184700624896 */
-				let written = bin.data.withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in return stream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count) }
+				let written = bin.data.withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in
+					/* We can bind or assume the bind. I prefer to assume the bind
+					 * here: we do not modify the memory in any way, we’re just
+					 * reading it in an unmutable state and discard the pointer just
+					 * next. What would be the point of binding the memory?
+					 * Disclaimer: My logic can be flawed… */
+					return stream.write(bytes.baseAddress!.assumingMemoryBound(to: UInt8.self), maxLength: bytes.count)
+				}
 				guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 				size += written
 			}
