@@ -354,20 +354,22 @@ final public class BSONSerialization {
 		
 		var data = Data(referencing: nsdata)
 		if !opt.contains(.skipSizes) {
-			let int32Size = MemoryLayout<Int32>.size
-			for (offset, var size) in sizes {
-				let sizeData = Data(bytes: &size, count: int32Size)
-				data[offset..<(offset + int32Size)] = sizeData
+			/* This method should be valid (in regard to the memory binding)
+			 * because we know the data won’t be aliased as we will modify and
+			 * access it in this method only.
+			 * More info: https://twitter.com/jckarter/status/1142446184700624896 */
+			data.withUnsafeMutableBytes{ (bytes: UnsafeMutableRawBufferPointer) -> Void in
+				let baseAddress = bytes.baseAddress!
+				for (offset, size) in sizes {
+					(baseAddress + offset).bindMemory(to: Int32.self, capacity: 1).pointee = size
+				}
 			}
-			/* Below is a possible variant for the above code. Apparently this
-			 * method is also valid because we know the data won’t be aliased as we
-			 * will modify and have access to it in this method only. See comment
-			 * below when writing MongoBinary data to a stream for more info. */
-//			data.withUnsafeMutableBytes{ (bytes: UnsafeMutableRawBufferPointer) -> Void in
-//				let baseAddress = bytes.baseAddress!
-//				for (offset, size) in sizes {
-//					(baseAddress + offset).bindMemory(to: Int32.self, capacity: 1).pointee = size
-//				}
+			/* A variant of the code above. While this variant is “safer” because
+			 * we know we won’t have memory binding problems, it is MUCH slower.*/
+//			let int32Size = MemoryLayout<Int32>.size
+//			for (offset, var size) in sizes {
+//				let sizeData = Data(bytes: &size, count: int32Size)
+//				data[offset..<(offset + int32Size)] = sizeData
 //			}
 		}
 		
