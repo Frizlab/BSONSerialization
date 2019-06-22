@@ -850,16 +850,20 @@ final public class BSONSerialization {
 	
 	private class func write<T>(value: inout T, toStream stream: OutputStream) throws -> Int {
 		let size = MemoryLayout<T>.size
-		guard size > 0 else {return 0} /* Less than probable that size is equal to zero... */
+		guard size > 0 else {return 0} /* Void size is 0 */
 		
-		return try withUnsafePointer(to: &value){ pointer -> Int in
-			#warning("This is illegal! (Line below) Memory rebound must be done with type that have the same size as the original one.")
-			return try pointer.withMemoryRebound(to: UInt8.self, capacity: size, { bytes -> Int in
-				let writtenSize = stream.write(bytes, maxLength: size)
-				guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-				return size
-			})
-		}
+		return try withUnsafePointer(to: &value, { pointer -> Int in
+			/* We cannot use withMemoryRebound because the doc says this method can
+			 * only be used if the new type have the same size and stride as the
+			 * original pointer’s type. So instead we have to convert the pointer
+			 * to a raw pointer and bind the raw pointer’s memory to UInt8. */
+			let rawPointer = UnsafeRawPointer(pointer)
+			let uint8Pointer = rawPointer.bindMemory(to: UInt8.self, capacity: size)
+			guard stream.write(uint8Pointer, maxLength: size) == size else {
+				throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)
+			}
+			return size
+		})
 	}
 	
 	private class func write(elementType: BSONElementType, toStream stream: OutputStream) throws -> Int {
