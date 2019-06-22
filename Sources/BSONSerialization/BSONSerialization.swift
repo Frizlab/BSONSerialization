@@ -769,7 +769,7 @@ final public class BSONSerialization {
 			} else {
 				allocatedPointer = true
 				nonNilSizesPointer = UnsafeMutablePointer<[Int]>.allocate(capacity: 1)
-				nonNilSizesPointer.initialize(repeating: try sizesOfBSONObject(BSONObject), count: 1)
+				nonNilSizesPointer.initialize(to: try sizesOfBSONObject(BSONObject))
 			}
 			docSize = Int32(nonNilSizesPointer.pointee.popLast()!/* If nil, this is an internal error */)
 			sizesPointer = nonNilSizesPointer
@@ -813,9 +813,14 @@ final public class BSONSerialization {
 		if str.count > 0 {
 			/* Let's get the UTF8 bytes of the string. */
 			let bytes = [UInt8](str.utf8)
+			assert(bytes.count > 0, "How on earth a non-empty string has 0 UTF-8 bytes?")
 			guard !bytes.contains(0) else {throw BSONSerializationError.unserializableCString(str)}
 			
-			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in
+				assert(p.count == bytes.count)
+				return stream.write(p.baseAddress!, maxLength: p.count)
+			}
+			
 			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 			written += curWrite
 		}
@@ -837,7 +842,12 @@ final public class BSONSerialization {
 		if str.count > 0 {
 			/* Let's get the UTF8 bytes of the string. */
 			let bytes = [UInt8](str.utf8)
-			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in return stream.write(p.baseAddress!, maxLength: bytes.count) }
+			assert(bytes.count > 0, "How on earth a non-empty string has 0 UTF-8 bytes?")
+			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in
+				assert(p.count == bytes.count)
+				return stream.write(p.baseAddress!, maxLength: p.count)
+			}
+			
 			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 			written += curWrite
 		}
