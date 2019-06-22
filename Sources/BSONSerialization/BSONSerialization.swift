@@ -359,11 +359,10 @@ final public class BSONSerialization {
 				let sizeData = Data(bytes: &size, count: int32Size)
 				data[offset..<(offset + int32Size)] = sizeData
 			}
-			/* Below is a possible variant for the above code. Note I’m not sure
-			 * the variant is sematically valid. We bind the underlying bytes of
-			 * the data object, and do not unbind them later, nor make sure they
-			 * were not bound before! For a Data referencing an NSData especially,
-			 * I have no idea what state the memory we get is in… */
+			/* Below is a possible variant for the above code. Apparently this
+			 * method is also valid because we know the data won’t be aliased as we
+			 * will modify and have access to it in this method only. See comment
+			 * below when writing MongoBinary data to a stream for more info. */
 //			data.withUnsafeMutableBytes{ (bytes: UnsafeMutableRawBufferPointer) -> Void in
 //				let baseAddress = bytes.baseAddress!
 //				for (offset, size) in sizes {
@@ -671,13 +670,11 @@ final public class BSONSerialization {
 			
 			/* Writing a 0-length data seems to make next writes to the stream fail */
 			if bin.data.count > 0 {
-				/* Note: We don’t know in which state the memory we’re given is (is
-				 * it unbound, uninitialized, etc.) The write to stream method
-				 * expects an UnsafePointer<UInt8>, that is a pointer to a memory
-				 * bound to UInt8. We thus have to (re-)bind the memory of the data
-				 * to UInt8. Because we don’t know the state of the previous memory,
-				 * we have to make a _copy_ of the data to be able to bind it… */
-				let written = Data(bin.data).withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in return stream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count) }
+				/* Note: Joe says we can bind the memory (or even assume it’s
+				 * already bound) to UInt8 because the memory will be immutable in
+				 * the closure, and thus cannot be aliased.
+				 * https://twitter.com/jckarter/status/1142446184700624896 */
+				let written = bin.data.withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in return stream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count) }
 				guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
 				size += written
 			}
@@ -837,6 +834,7 @@ final public class BSONSerialization {
 		guard size > 0 else {return 0} /* Less than probable that size is equal to zero... */
 		
 		return try withUnsafePointer(to: &value){ pointer -> Int in
+			#warning("This is illegal! (Line below) Memory rebound must be done with type that have the same size as the original one.")
 			return try pointer.withMemoryRebound(to: UInt8.self, capacity: size, { bytes -> Int in
 				let writtenSize = stream.write(bytes, maxLength: size)
 				guard size == writtenSize else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
