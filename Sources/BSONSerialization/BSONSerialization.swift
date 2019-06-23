@@ -146,13 +146,13 @@ final public class BSONSerialization {
 	- Returns: The serialized BSON data.
 	*/
 	public class func bsonObject(with stream: InputStream, options opt: ReadingOptions = []) throws -> BSONDoc {
-		let bufferedInputStream = SimpleInputStream(stream: stream, bufferSize: 1024*1024, streamReadSizeLimit: nil)
+		let bufferedInputStream = SimpleInputStream(stream: stream, bufferSize: 1024*1024, bufferSizeIncrement: 1024, streamReadSizeLimit: nil)
 		return try bsonObject(with: bufferedInputStream, options: opt)
 	}
 	
 	/* Note: Whenever we can, I'd like to have a non-escaping optional closure...
 	 * Other Note: decodeCallback is **NOT** called when a SUB-key is decoded. */
-	class func bsonObject(with bufferStream: SimpleStream, options opt: ReadingOptions = [], initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
+	class func bsonObject(with bufferStream: SimpleReadStream, options opt: ReadingOptions = [], initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
@@ -186,7 +186,7 @@ final public class BSONSerialization {
 				ret[key] = .some(nil)
 				
 			case .boolean?:
-				let valAsInt8 = try bufferStream.readData(size: 1, alwaysCopyBytes: false).first!
+				let valAsInt8 = try bufferStream.readData(size: 1).first!
 				switch valAsInt8 {
 				case 1: try decodeCallback(key, true);  ret[key] = true
 				case 0: try decodeCallback(key, false); ret[key] = false
@@ -265,8 +265,8 @@ final public class BSONSerialization {
 				ret[key] = val
 				
 			case .timestamp?:
-				let increment = try bufferStream.readData(size: 4, alwaysCopyBytes: true)
-				let timestamp = try bufferStream.readData(size: 4, alwaysCopyBytes: true)
+				let increment = try bufferStream.readData(size: 4)
+				let timestamp = try bufferStream.readData(size: 4)
 				let val = MongoTimestamp(incrementData: increment, timestampData: timestamp)
 				try decodeCallback(key, val)
 				ret[key] = val
@@ -274,7 +274,7 @@ final public class BSONSerialization {
 			case .binary?:
 				let size: Int32 = try bufferStream.readType()
 				let subtypeInt: UInt8 = try bufferStream.readType()
-				let data = try bufferStream.readData(size: Int(size), alwaysCopyBytes: true)
+				let data = try bufferStream.readData(size: Int(size))
 				let val = MongoBinary(binaryTypeAsInt: subtypeInt, data: data)
 				try decodeCallback(key, val)
 				ret[key] = val
@@ -318,7 +318,7 @@ final public class BSONSerialization {
 				
 			case .dbPointer?:
 				let stringPart = try bufferStream.readBSONString(encoding: .utf8)
-				let bytesPartData = try bufferStream.readData(size: 12, alwaysCopyBytes: true)
+				let bytesPartData = try bufferStream.readData(size: 12)
 				let val = MongoDBPointer(stringPart: stringPart, bytesPartData: bytesPartData)
 				try decodeCallback(key, val)
 				ret[key] = val
@@ -509,9 +509,9 @@ final public class BSONSerialization {
 		case _ as Int where MemoryLayout<Int>.size == MemoryLayout<Int64>.size:
 			size += MemoryLayout<Int64>.size
 			
-		case _ as Double:                      size += 8  /* 64  bits is 8  bytes */
-		case _ as Double128:                   size += 16 /* 128 bits is 16 bytes */
-		case _ as Date:                        size += 8  /* Encoded as an Int64 */
+		case _ as Double:    size += 8  /* 64  bits is 8  bytes */
+		case _ as Double128: size += 16 /* 128 bits is 16 bytes */
+		case _ as Date:      size += 8  /* Encoded as an Int64 */
 			
 		case let regexp as NSRegularExpression:
 			size += regexp.pattern.utf8.count + 1
@@ -902,16 +902,15 @@ final public class BSONSerialization {
    MARK: -
    ******* */
 
-private extension SimpleStream {
+private extension SimpleReadStream {
 	
 	func readCString(encoding: String.Encoding) throws -> String {
-		let data = try readData(upToDelimiters: [Data([0])], matchingMode: .anyMatchWins, includeDelimiter: false, alwaysCopyBytes: false)
-		_ = try readData(size: 1, alwaysCopyBytes: false)
+		let data = try readData(upTo: [Data([0])], matchingMode: .anyMatchWins, includeDelimiter: false).data
+		try readData(size: 1, { _ in })
 		
 		/* This String init fails if the data is invalid for the given encoding. */
 		guard let str = String(data: data, encoding: encoding) else {
-			/* MUST copy the data as the original bytes are not owned by us. */
-			throw BSONSerialization.BSONSerializationError.invalidString(Data(data))
+			throw BSONSerialization.BSONSerializationError.invalidString(data)
 		}
 		
 		return str
@@ -921,18 +920,21 @@ private extension SimpleStream {
 		/* Reading the string size. */
 		let stringSize: Int32 = try readType()
 		
-		/* Reading the actual string. */
-		let data = try readData(size: Int(stringSize)-1, alwaysCopyBytes: false)
-		assert(data.count == Int(stringSize-1))
-		guard let str = String(data: data, encoding: encoding) else {
-			/* MUST copy the data as the original bytes are not owned by us. */
-			throw BSONSerialization.BSONSerializationError.invalidString(Data(data))
+		/* Reading the actual string. Note: We use the copying version of the
+		 * simple read stream protocol. We could use the version which gives
+		 * access to the raw buffer pointer instead and avoid a copy when the
+		 * string data is valid for the given encoding, but it’s not worth it. */
+		let strData = try readData(size: Int(stringSize-1))
+		assert(strData.count == Int(stringSize-1))
+		guard let str = String(data: strData, encoding: encoding) else {
+			throw BSONSerialization.BSONSerializationError.invalidString(strData)
 		}
 		
 		/* Reading the last byte and checking it is indeed 0. */
-		let null = try readData(size: 1, alwaysCopyBytes: false)
-		assert(null.count == 1)
-		guard null.first == 0 else {throw BSONSerialization.BSONSerializationError.invalidEndOfString(null.first)}
+		try readData(size: 1, { null in
+			assert(null.count == 1)
+			guard null.first == 0 else {throw BSONSerialization.BSONSerializationError.invalidEndOfString(null.first)}
+		})
 		
 		return str
 	}
