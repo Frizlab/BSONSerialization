@@ -557,8 +557,8 @@ final public class BSONSerialization {
 			size += sizeOfBSONEncodedString(dbPointer.stringPart)
 			size += 12
 			
-		default:
-			throw BSONSerializationError.invalidBSONObject(invalidElement: entity! /* nil case already processed above */)
+		case let unknown?:
+			throw BSONSerializationError.invalidBSONObject(invalidElement: unknown)
 		}
 		
 		return (size, subSizes)
@@ -739,8 +739,8 @@ final public class BSONSerialization {
 			size += try write(BSONEncodedString: dbPointer.stringPart, toStream: stream)
 			size += try write(value: &bytes, toStream: stream)
 			
-		default:
-			throw BSONSerializationError.invalidBSONObject(invalidElement: entity! /* nil case already processed above */)
+		case let unknown?:
+			throw BSONSerializationError.invalidBSONObject(invalidElement: unknown)
 		}
 		
 		return size
