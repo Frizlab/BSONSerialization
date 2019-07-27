@@ -84,6 +84,8 @@ extension BSONSerializationTests {
         ("testSizeEmbeddedBSONsInArrayBSON", testSizeEmbeddedBSONsInArrayBSON),
         ("testSizeEmptyBSON", testSizeEmptyBSON),
         ("testSizeSimpleEmbeddedBSON", testSizeSimpleEmbeddedBSON),
+        ("testTwoBSONDocsInOneDataStream", testTwoBSONDocsInOneDataStream),
+        ("testTwoBSONDocsInOneInputStream", testTwoBSONDocsInOneInputStream),
     ]
 }
 
