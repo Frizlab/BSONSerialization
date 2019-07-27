@@ -7,8 +7,10 @@
  */
 
 import XCTest
-import Foundation
 @testable import BSONSerialization
+
+import Foundation
+import SimpleStream
 
 
 
@@ -827,6 +829,41 @@ class BSONSerializationTests: XCTestCase {
 			let encoded = try dataFromWriteStream(writeBlock: { _ = try BSONSerialization.writeBSONObject(ref, to: $0, options: []) })
 			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
 			XCTAssert((try? areBSONDocEqual(decoded, ref)) ?? false)
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	
+	func testTwoBSONDocsInOneDataStream() {
+		do {
+			let bsonDocData = Data(hexEncoded: "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00")!
+			let stream = SimpleDataStream(data: bsonDocData + bsonDocData + bsonDocData)
+			let doc1 = try BSONSerialization.bsonObject(with: stream)
+			let doc2 = try BSONSerialization.bsonObject(with: stream)
+			let doc3 = try BSONSerialization.bsonObject(with: stream)
+			let ref = ["abc": "def"]
+			XCTAssert(try areBSONDocEqual(ref, doc1))
+			XCTAssert(try areBSONDocEqual(ref, doc2))
+			XCTAssert(try areBSONDocEqual(ref, doc3))
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
+	func testTwoBSONDocsInOneInputStream() {
+		do {
+			let bsonDocData = Data(hexEncoded: "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00")!
+			let stream = InputStream(data: bsonDocData + bsonDocData + bsonDocData)
+			stream.open(); defer {stream.close()}
+			
+			let doc1 = try BSONSerialization.bsonObject(with: stream)
+			let doc2 = try BSONSerialization.bsonObject(with: stream)
+			let doc3 = try BSONSerialization.bsonObject(with: stream)
+			let ref = ["abc": "def"]
+			XCTAssert(try areBSONDocEqual(ref, doc1))
+			XCTAssert(try areBSONDocEqual(ref, doc2))
+			XCTAssert(try areBSONDocEqual(ref, doc3))
 		} catch {
 			XCTFail("\(error)")
 		}

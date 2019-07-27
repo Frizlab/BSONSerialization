@@ -152,20 +152,23 @@ final public class BSONSerialization {
 	
 	/* Note: Whenever we can, I'd like to have a non-escaping optional closure...
 	 * Other Note: decodeCallback is **NOT** called when a SUB-key is decoded. */
-	class func bsonObject(with bufferStream: SimpleReadStream, options opt: ReadingOptions = [], initialReadPosition: Int = 0, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
+	class func bsonObject(with bufferStream: SimpleReadStream, options opt: ReadingOptions = [], initialReadPosition: Int? = nil, decodeCallback: (_ key: String, _ val: Any?) throws -> Void = {_,_ in}) throws -> BSONDoc {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		/* TODO: Handle endianness! */
 		
+		let initialReadPosition = initialReadPosition ?? bufferStream.currentReadPosition
+		
+		let previousStreamReadSizeLimit = bufferStream.readSizeLimit
+		defer {bufferStream.readSizeLimit = previousStreamReadSizeLimit}
+		
+		bufferStream.readSizeLimit = initialReadPosition + MemoryLayout<Int32>.size
 		let length32: Int32 = try bufferStream.readType()
 		guard length32 >= 5 else {throw BSONSerializationError.dataTooSmall}
 		
 		let length = Int(length32)
-		let previousStreamReadSizeLimit: Int?
-		if let bufferedInputStream = bufferStream as? SimpleInputStream {previousStreamReadSizeLimit = bufferedInputStream.streamReadSizeLimit; bufferedInputStream.streamReadSizeLimit = initialReadPosition + length}
-		else                                                            {previousStreamReadSizeLimit = nil}
-		defer {if let bufferedInputStream = bufferStream as? SimpleInputStream {bufferedInputStream.streamReadSizeLimit = previousStreamReadSizeLimit}}
+		bufferStream.readSizeLimit = initialReadPosition + length
 		
 		var ret = [String: Any?]()
 		

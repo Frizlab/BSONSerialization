@@ -9,7 +9,7 @@ let package = Package(
 		.library(name: "BSONSerialization", targets: ["BSONSerialization"])
 	],
 	dependencies: [
-		.package(url: "https://github.com/Frizlab/SimpleStream", from: "2.0.0"),
+		.package(url: "https://github.com/Frizlab/SimpleStream", from: "2.1.0"),
 	],
 	targets: [
 		.target(name: "BSONSerialization", dependencies: ["SimpleStream"]),
