@@ -570,7 +570,34 @@ final public class BSONSerialization {
 	private class func sizeOfBSONEncodedString(_ str: String) -> Int {
 		return 4 /* length of the string is represented as an Int32 */ + str.utf8.count + 1 /* The '\0' terminator */
 	}
-	
+
+	private class func typeOf(BSONEntity entity: Any?) -> Any? {
+			switch entity {
+			case let val as NSNumber:
+					switch CFGetTypeID(val as CFTypeRef) {
+					case CFBooleanGetTypeID():
+							return val.boolValue
+					case CFNumberGetTypeID():
+							switch CFNumberGetType(val as CFNumber) {
+							case .sInt16Type:
+									return val.int16Value
+							case .sInt32Type:
+									return val.int32Value
+							case .sInt64Type:
+									return val.int64Value
+							case .doubleType:
+									return val.doubleValue
+							default: ()
+							}
+					default: ()
+					}
+			default:
+					return entity
+			}
+
+			return entity
+	}
+
 	/** Writes the given entity to the stream.
 	
 	- Note: The .skipSizes option is ignored (determined by whether the sizes
@@ -582,8 +609,8 @@ final public class BSONSerialization {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		var size = 0
-		
-		switch entity {
+
+		switch typeOf(BSONEntity: entity) {
 		case nil:
 			size += try write(elementType: .null, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
