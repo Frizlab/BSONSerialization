@@ -420,6 +420,52 @@ final public class BSONSerialization {
 		return (try? sizesOfBSONObject(obj)) != nil
 	}
 	
+	/* ****************
+	   MARK: - Internal
+	   **************** */
+	
+	/**
+	Workaround a typing limitation caused by `NSNumber` on macOS.
+	
+	On macOS, if a BSON doc contains an `NSNumber` representing the `Int` 0,
+	Swift will happily cast it to a `Bool` containing `false`.
+	
+	This can be a problem. When switching on the entity being encoded to find its
+	type, we can encode an Int as a Bool (or vice versa depending on the order of
+	the switch cases).
+	
+	So we “normalize” the input entity by converting an `NSNumber` to its encoded
+	type.
+	
+	For the time being we only have this normalization done; we might find more
+	later. */
+	internal class func normalized(BSONEntity entity: Any?) -> Any? {
+		#if os(macOS)
+		switch entity {
+		case let val as NSNumber:
+			switch CFGetTypeID(val as CFTypeRef) {
+			case CFBooleanGetTypeID():
+				return val.boolValue
+				
+			case CFNumberGetTypeID():
+				switch CFNumberGetType(val as CFNumber) {
+				case .sInt16Type: return val.int16Value
+				case .sInt32Type: return val.int32Value
+				case .sInt64Type: return val.int64Value
+				case .doubleType: return val.doubleValue
+				default: ()
+				}
+				
+			default: ()
+			}
+			
+		default: ()
+		}
+		#endif
+		
+		return entity
+	}
+	
 	/* ***************
 	   MARK: - Private
 	   *************** */
@@ -570,36 +616,7 @@ final public class BSONSerialization {
 	private class func sizeOfBSONEncodedString(_ str: String) -> Int {
 		return 4 /* length of the string is represented as an Int32 */ + str.utf8.count + 1 /* The '\0' terminator */
 	}
-
-	private class func typeOf(BSONEntity entity: Any?) -> Any? {
-		  #if os(macOS)
-				switch entity {
-				case let val as NSNumber:
-						switch CFGetTypeID(val as CFTypeRef) {
-						case CFBooleanGetTypeID():
-								return val.boolValue
-						case CFNumberGetTypeID():
-								switch CFNumberGetType(val as CFNumber) {
-								case .sInt16Type:
-										return val.int16Value
-								case .sInt32Type:
-										return val.int32Value
-								case .sInt64Type:
-										return val.int64Value
-								case .doubleType:
-										return val.doubleValue
-								default: ()
-								}
-						default: ()
-						}
-				default:
-						return entity
-				}
-			#endif
-
-			return entity
-	}
-
+	
 	/** Writes the given entity to the stream.
 	
 	- Note: The .skipSizes option is ignored (determined by whether the sizes
@@ -611,8 +628,8 @@ final public class BSONSerialization {
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
 		var size = 0
-
-		switch typeOf(BSONEntity: entity) {
+		
+		switch normalized(BSONEntity: entity) {
 		case nil:
 			size += try write(elementType: .null, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)

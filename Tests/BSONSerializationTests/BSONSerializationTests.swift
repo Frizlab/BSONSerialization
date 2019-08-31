@@ -868,25 +868,22 @@ class BSONSerializationTests: XCTestCase {
 			XCTFail("\(error)")
 		}
 	}
-
-	func testJSONSerializationToBSONDoc() {
-		do {
-			let jsonString = """
+	
+	
+	func testJSONSerializationToBSONDoc() throws {
+		let jsonString = """
 			{
 				"intProp": 0,
 				"boolProp": false
 			}
 			"""
-			let ref = try! JSONSerialization.jsonObject(with: jsonString.data(using: .utf8)!, options: []) as! [String: Any]
-			let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
-			let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
-			XCTAssert(try areBSONDocEqual(ref, decoded))
-		} catch {
-			XCTFail("\(error)")
-		}
+		let ref = try! JSONSerialization.jsonObject(with: Data(jsonString.utf8), options: []) as! [String: Any]
+		let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+		let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
+		XCTAssert(try areBSONDocEqual(ref, decoded))
 	}
-
-
+	
+	
 	func testIsValidBSONDoc1() {
 		let valid: BSONDoc = [:]
 		XCTAssertTrue(BSONSerialization.isValidBSONObject(valid))
