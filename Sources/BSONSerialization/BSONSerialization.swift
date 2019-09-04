@@ -526,14 +526,14 @@ final public class BSONSerialization {
 			case BSONSerialization.intObjCNumberType:  return val.intValue
 			case BSONSerialization.uintObjCNumberType: return val.uintValue
 				
-			case BSONSerialization.int8ObjCNumberType:  return val.int8Value
-			case BSONSerialization.uint8ObjCNumberType: return val.uint8Value
+			case BSONSerialization.int8ObjCNumberType:  return val.int32Value
+			case BSONSerialization.uint8ObjCNumberType: return val.int32Value
 				
-			case BSONSerialization.int16ObjCNumberType:  return val.int16Value
-			case BSONSerialization.uint16ObjCNumberType: return val.uint16Value
+			case BSONSerialization.int16ObjCNumberType:  return val.int32Value
+			case BSONSerialization.uint16ObjCNumberType: return val.int32Value
 				
 			case BSONSerialization.int32ObjCNumberType:  return val.int32Value
-			case BSONSerialization.uint32ObjCNumberType: return val.uint32Value
+			case BSONSerialization.uint32ObjCNumberType: return val.int64Value /* So as not to lose precision */
 				
 			case BSONSerialization.int64ObjCNumberType:  return val.int64Value
 			case BSONSerialization.uint64ObjCNumberType: return val.uint64Value
