@@ -877,9 +877,10 @@ class BSONSerializationTests: XCTestCase {
 				"boolProp": false
 			}
 			"""
-		let ref = try! JSONSerialization.jsonObject(with: Data(jsonString.utf8), options: []) as! [String: Any]
+		let ref = try! JSONSerialization.jsonObject(with: Data(jsonString.utf8), options: []) as! [String: AnyHashable]
 		let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
 		let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
+		XCTAssertEqual(ref, decoded as! [String: AnyHashable])
 		XCTAssert(try areBSONDocEqual(ref, decoded))
 	}
 	

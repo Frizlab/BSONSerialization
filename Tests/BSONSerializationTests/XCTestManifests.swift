@@ -76,6 +76,7 @@ extension BSONSerializationTests {
         ("testIsValidBSONDoc1", testIsValidBSONDoc1),
         ("testIsValidBSONDoc2", testIsValidBSONDoc2),
         ("testIsValidBSONDoc3", testIsValidBSONDoc3),
+        ("testJSONSerializationToBSONDoc", testJSONSerializationToBSONDoc),
         ("testPerformanceDecode4242EmptyDictionaryFromData", testPerformanceDecode4242EmptyDictionaryFromData),
         ("testSimpleArrayFromData", testSimpleArrayFromData),
         ("testSimpleEmbeddedDocFromData", testSimpleEmbeddedDocFromData),
