@@ -441,11 +441,7 @@ final public class BSONSerialization {
 	later. */
 	internal class func normalized(BSONEntity entity: Any?) -> Any? {
 		switch entity {
-//		/* The “where” in this “case” might seem redundant, but we do not want to
-//		 * convert a non-NSNumber entity to an NSNumber and back to the original
-//		 * entity. Swift being a little over-zealous when checking if a type is
-//		 * NSNumber, without the “where” we’d end up doing the double-conversion… */
-		case let val as NSNumber/* where type(of: entity!) == NSNumber.self*/:
+		case let val as NSNumber:
 			#if !os(Linux)
 			switch CFGetTypeID(val as CFTypeRef) {
 			case CFBooleanGetTypeID():
