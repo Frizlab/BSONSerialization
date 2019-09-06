@@ -156,7 +156,7 @@ final public class BSONSerialization {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
-		/* TODO: Handle endianness! */
+		/* TODO: Handle endianness! (BSON is little-endian) */
 		
 		let initialReadPosition = initialReadPosition ?? bufferStream.currentReadPosition
 		
@@ -196,8 +196,18 @@ final public class BSONSerialization {
 				default: throw BSONSerializationError.invalidBooleanValue(valAsInt8)
 				}
 				
+			case .int32Bits? where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
+				let val: Int = try bufferStream.readType()
+				try decodeCallback(key, val)
+				ret[key] = val
+				
 			case .int32Bits?:
 				let val: Int32 = try bufferStream.readType()
+				try decodeCallback(key, val)
+				ret[key] = val
+				
+			case .int64Bits? where MemoryLayout<Int>.size == MemoryLayout<Int64>.size:
+				let val: Int = try bufferStream.readType()
 				try decodeCallback(key, val)
 				ret[key] = val
 				
@@ -396,7 +406,7 @@ final public class BSONSerialization {
 	
 	- Returns: The number of bytes written. */
 	public class func writeBSONObject(_ BSONObject: BSONDoc, to stream: OutputStream, options opt: WritingOptions = []) throws -> Int {
-		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: {_,_ in})
+		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: { _, _ in })
 	}
 	
 	public class func sizesOfBSONObject(_ obj: BSONDoc) throws -> [Int] {
@@ -516,9 +526,12 @@ final public class BSONSerialization {
 			default: ()
 			}
 			#else
+			/* 🤢 but I did not find a better way */
+			if NSStringFromClass(type(of: val)).lowercased().contains("bool") {
+				return val.boolValue
+			}
+			
 			switch String(cString: val.objCType) {
-			case BSONSerialization.boolObjCNumberType: return val.boolValue
-				
 			case BSONSerialization.intObjCNumberType:  return val.intValue
 			case BSONSerialization.uintObjCNumberType: return val.uintValue
 				
@@ -529,7 +542,7 @@ final public class BSONSerialization {
 			case BSONSerialization.uint16ObjCNumberType: return val.int32Value
 				
 			case BSONSerialization.int32ObjCNumberType:  return val.int32Value
-			case BSONSerialization.uint32ObjCNumberType: return val.int64Value /* So as not to lose precision */
+			case BSONSerialization.uint32ObjCNumberType: return val.int64Value /* So as not int overflow */
 				
 			case BSONSerialization.int64ObjCNumberType:  return val.int64Value
 			case BSONSerialization.uint64ObjCNumberType: return val.uint64Value
@@ -646,9 +659,9 @@ final public class BSONSerialization {
 		var size = 1 /* Type of the element */
 		size += key.utf8.count + 1 /* Size of the encoded key */
 		
-		switch entity {
+		switch normalized(BSONEntity: entity) {
 		case nil: (/*nop; this value does not have anything to write*/)
-		case _ as Bool:                        size += 1
+		case _ as Bool: size += 1
 			
 		case _ as Int32: fallthrough
 		case _ as Int where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
