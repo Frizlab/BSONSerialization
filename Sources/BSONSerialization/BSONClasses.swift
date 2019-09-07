@@ -211,6 +211,8 @@ public func areBSONDocEqual(_ doc1: BSONDoc, _ doc2: BSONDoc) throws -> Bool {
 }
 
 private func areBSONEntitiesEqual(_ entity1: Any?, _ entity2: Any?) throws -> Bool {
+	let entity1 = BSONSerialization.normalized(BSONEntity: entity1)
+	let entity2 = BSONSerialization.normalized(BSONEntity: entity2)
 	switch entity1 {
 	case nil:             guard entity2          == nil else {return false}
 	case let val as Bool: guard entity2 as? Bool == val else {return false}

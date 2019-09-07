@@ -870,6 +870,28 @@ class BSONSerializationTests: XCTestCase {
 	}
 	
 	
+	func testJSONSerializationToBSONDoc() throws {
+		let jsonString = """
+			{
+				"intProp": 0,
+				"boolProp": false
+			}
+			"""
+		
+		let ref = try! JSONSerialization.jsonObject(with: Data(jsonString.utf8), options: []) as! [String: Any?]
+		let encoded = try BSONSerialization.data(withBSONObject: ref, options: [])
+		let decoded = try BSONSerialization.bsonObject(with: encoded, options: [])
+		
+		XCTAssert(try areBSONDocEqual(ref, decoded))
+		
+		XCTAssertFalse(decoded["boolProp"] is Int)
+		XCTAssertFalse(decoded["intProp"] is Bool)
+		
+		XCTAssertTrue(decoded["boolProp"] is Bool)
+		XCTAssertTrue(decoded["intProp"] is Int)
+	}
+	
+	
 	func testIsValidBSONDoc1() {
 		let valid: BSONDoc = [:]
 		XCTAssertTrue(BSONSerialization.isValidBSONObject(valid))

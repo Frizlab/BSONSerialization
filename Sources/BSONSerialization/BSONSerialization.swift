@@ -156,7 +156,7 @@ final public class BSONSerialization {
 		precondition(MemoryLayout<Int32>.size <= MemoryLayout<Int>.size, "I currently need Int32 to be lower or equal in size than Int")
 		precondition(MemoryLayout<Double>.size == 8, "I currently need Double to be 64 bits")
 		
-		/* TODO: Handle endianness! */
+		/* TODO: Handle endianness! (BSON is little-endian) */
 		
 		let initialReadPosition = initialReadPosition ?? bufferStream.currentReadPosition
 		
@@ -196,8 +196,18 @@ final public class BSONSerialization {
 				default: throw BSONSerializationError.invalidBooleanValue(valAsInt8)
 				}
 				
+			case .int32Bits? where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
+				let val: Int = try bufferStream.readType()
+				try decodeCallback(key, val)
+				ret[key] = val
+				
 			case .int32Bits?:
 				let val: Int32 = try bufferStream.readType()
+				try decodeCallback(key, val)
+				ret[key] = val
+				
+			case .int64Bits? where MemoryLayout<Int>.size == MemoryLayout<Int64>.size:
+				let val: Int = try bufferStream.readType()
 				try decodeCallback(key, val)
 				ret[key] = val
 				
@@ -396,7 +406,7 @@ final public class BSONSerialization {
 	
 	- Returns: The number of bytes written. */
 	public class func writeBSONObject(_ BSONObject: BSONDoc, to stream: OutputStream, options opt: WritingOptions = []) throws -> Int {
-		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: {_,_ in})
+		return try write(BSONObject: BSONObject, toStream: stream, options: opt, initialWritePosition: 0, sizes: nil, sizeFoundCallback: { _, _ in })
 	}
 	
 	public class func sizesOfBSONObject(_ obj: BSONDoc) throws -> [Int] {
@@ -420,9 +430,158 @@ final public class BSONSerialization {
 		return (try? sizesOfBSONObject(obj)) != nil
 	}
 	
+	/* ****************
+	   MARK: - Internal
+	   **************** */
+	
+	/**
+	Workaround a typing limitation caused by `NSNumber`.
+	
+	If a BSON doc contains an `NSNumber` representing the `Int` 0, Swift will
+	happily cast it to a `Bool` containing `false`.
+	
+	This can be a problem. When switching on the entity being encoded to find its
+	type, we can encode an Int as a Bool (or vice versa depending on the order of
+	the switch cases).
+	
+	So we “normalize” the input entity by converting an `NSNumber` to its encoded
+	type.
+	
+	For the time being we only have this normalization done; we might find more
+	later. */
+	internal class func normalized(BSONEntity entity: Any?) -> Any? {
+		switch entity {
+		case let val as NSNumber:
+			#if !os(Linux)
+			switch CFGetTypeID(val as CFTypeRef) {
+			case CFBooleanGetTypeID():
+				return val.boolValue
+				
+			case CFNumberGetTypeID():
+				switch CFNumberGetType(val as CFNumber) {
+				case .charType: return val.uint8Value /* “UInt8” or “Int8”? I don’t know! */
+					
+				case .intType: return val.intValue
+					
+				case .sInt8Type where MemoryLayout<Int8>.size == MemoryLayout<Int>.size: return val.intValue
+				case .sInt8Type:                                                         return val.int8Value
+					
+				case .sInt16Type where MemoryLayout<Int16>.size == MemoryLayout<Int>.size: return val.intValue
+				case .sInt16Type:                                                          return val.int16Value
+					
+				case .sInt32Type where MemoryLayout<Int32>.size == MemoryLayout<Int>.size: return val.intValue
+				case .sInt32Type:                                                          return val.int32Value
+					
+				case .sInt64Type where MemoryLayout<Int64>.size == MemoryLayout<Int>.size: return val.intValue
+				case .sInt64Type:                                                          return val.int64Value
+					
+				case .floatType:  return val.floatValue
+				case .doubleType: return val.doubleValue
+					
+				case .float32Type where MemoryLayout<Float32>.size == MemoryLayout<Float>.size: return val.floatValue
+				case .float32Type:                                                              return val.doubleValue /* We return the biggest float precision we get (float32Value does not exist on NSNumber) */
+					
+				case .float64Type where MemoryLayout<Float64>.size == MemoryLayout<Float>.size: return val.floatValue
+				case .float64Type:                                                              return val.doubleValue /* We return the biggest float precision we get (float64Value does not exist on NSNumber) */
+					
+				case .cgFloatType where MemoryLayout<CGFloat>.size == MemoryLayout<Float>.size: return val.floatValue
+				case .cgFloatType:                                                              return val.doubleValue /* We return the biggest float precision we get (float64Value does not exist on NSNumber) */
+					
+				case .shortType where MemoryLayout<CShort>.size == MemoryLayout<Int>.size:   return val.intValue
+				case .shortType where MemoryLayout<CShort>.size == MemoryLayout<Int8>.size:  return val.int8Value
+				case .shortType where MemoryLayout<CShort>.size == MemoryLayout<Int16>.size: return val.int16Value
+				case .shortType where MemoryLayout<CShort>.size == MemoryLayout<Int32>.size: return val.int32Value
+				case .shortType where MemoryLayout<CShort>.size == MemoryLayout<Int64>.size: return val.int64Value
+				case .shortType:                                                             return val.intValue
+					
+				case .longType where MemoryLayout<CLong>.size == MemoryLayout<Int>.size:   return val.intValue
+				case .longType where MemoryLayout<CLong>.size == MemoryLayout<Int8>.size:  return val.int8Value
+				case .longType where MemoryLayout<CLong>.size == MemoryLayout<Int16>.size: return val.int16Value
+				case .longType where MemoryLayout<CLong>.size == MemoryLayout<Int32>.size: return val.int32Value
+				case .longType where MemoryLayout<CLong>.size == MemoryLayout<Int64>.size: return val.int64Value
+				case .longType:                                                            return val.intValue
+					
+				case .longLongType where MemoryLayout<CLongLong>.size == MemoryLayout<Int>.size:   return val.intValue
+				case .longLongType where MemoryLayout<CLongLong>.size == MemoryLayout<Int8>.size:  return val.int8Value
+				case .longLongType where MemoryLayout<CLongLong>.size == MemoryLayout<Int16>.size: return val.int16Value
+				case .longLongType where MemoryLayout<CLongLong>.size == MemoryLayout<Int32>.size: return val.int32Value
+				case .longLongType where MemoryLayout<CLongLong>.size == MemoryLayout<Int64>.size: return val.int64Value
+				case .longLongType:                                                                return val.intValue
+					
+				case .cfIndexType where MemoryLayout<CFIndex>.size == MemoryLayout<Int>.size:   return val.intValue
+				case .cfIndexType where MemoryLayout<CFIndex>.size == MemoryLayout<Int8>.size:  return val.int8Value
+				case .cfIndexType where MemoryLayout<CFIndex>.size == MemoryLayout<Int16>.size: return val.int16Value
+				case .cfIndexType where MemoryLayout<CFIndex>.size == MemoryLayout<Int32>.size: return val.int32Value
+				case .cfIndexType where MemoryLayout<CFIndex>.size == MemoryLayout<Int64>.size: return val.int64Value
+				case .cfIndexType:                                                              return val.intValue
+					
+				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int>.size:   return val.intValue
+				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int8>.size:  return val.int8Value
+				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int16>.size: return val.int16Value
+				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int32>.size: return val.int32Value
+				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int64>.size: return val.int64Value
+				case .nsIntegerType:                                                                return val.intValue
+				}
+				
+			default: ()
+			}
+			#else
+			/* 🤢 but I did not find a better way */
+			if NSStringFromClass(type(of: val)).lowercased().contains("bool") {
+				return val.boolValue
+			}
+			
+			switch String(cString: val.objCType) {
+			case BSONSerialization.intObjCNumberType:  return val.intValue
+			case BSONSerialization.uintObjCNumberType: return val.uintValue
+				
+			case BSONSerialization.int8ObjCNumberType:  return val.int32Value
+			case BSONSerialization.uint8ObjCNumberType: return val.int32Value
+				
+			case BSONSerialization.int16ObjCNumberType:  return val.int32Value
+			case BSONSerialization.uint16ObjCNumberType: return val.int32Value
+				
+			case BSONSerialization.int32ObjCNumberType:  return val.int32Value
+			case BSONSerialization.uint32ObjCNumberType: return val.int64Value /* So as not int overflow */
+				
+			case BSONSerialization.int64ObjCNumberType:  return val.int64Value
+			case BSONSerialization.uint64ObjCNumberType: return val.uint64Value
+				
+			case BSONSerialization.floatObjCNumberType:  return val.floatValue
+			case BSONSerialization.doubleObjCNumberType: return val.doubleValue
+				
+			default: ()
+			}
+			#endif
+			
+		default: ()
+		}
+		
+		return entity
+	}
+	
 	/* ***************
 	   MARK: - Private
 	   *************** */
+	
+	#if os(Linux)
+	private static let boolObjCNumberType = String(cString: NSNumber(value: false).objCType)
+	
+	private static let intObjCNumberType   = String(cString: NSNumber(value:   Int(0)).objCType)
+	private static let int8ObjCNumberType  = String(cString: NSNumber(value:  Int8(0)).objCType)
+	private static let int16ObjCNumberType = String(cString: NSNumber(value: Int16(0)).objCType)
+	private static let int32ObjCNumberType = String(cString: NSNumber(value: Int32(0)).objCType)
+	private static let int64ObjCNumberType = String(cString: NSNumber(value: Int64(0)).objCType)
+	
+	private static let uintObjCNumberType   = String(cString: NSNumber(value:   UInt(0)).objCType)
+	private static let uint8ObjCNumberType  = String(cString: NSNumber(value:  UInt8(0)).objCType)
+	private static let uint16ObjCNumberType = String(cString: NSNumber(value: UInt16(0)).objCType)
+	private static let uint32ObjCNumberType = String(cString: NSNumber(value: UInt32(0)).objCType)
+	private static let uint64ObjCNumberType = String(cString: NSNumber(value: UInt64(0)).objCType)
+	
+	private static let floatObjCNumberType  = String(cString: NSNumber(value:  Float(0)).objCType)
+	private static let doubleObjCNumberType = String(cString: NSNumber(value: Double(0)).objCType)
+	#endif
 	
 	/** The recognized BSON element types. */
 	private enum BSONElementType : UInt8 {
@@ -500,9 +659,9 @@ final public class BSONSerialization {
 		var size = 1 /* Type of the element */
 		size += key.utf8.count + 1 /* Size of the encoded key */
 		
-		switch entity {
+		switch normalized(BSONEntity: entity) {
 		case nil: (/*nop; this value does not have anything to write*/)
-		case _ as Bool:                        size += 1
+		case _ as Bool: size += 1
 			
 		case _ as Int32: fallthrough
 		case _ as Int where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
@@ -583,7 +742,7 @@ final public class BSONSerialization {
 		
 		var size = 0
 		
-		switch entity {
+		switch normalized(BSONEntity: entity) {
 		case nil:
 			size += try write(elementType: .null, toStream: stream)
 			size += try write(CEncodedString: key, toStream: stream)
