@@ -8,7 +8,9 @@
 
 import Foundation
 import SimpleStream
-
+#if !os(Linux)
+import CoreGraphics
+#endif
 
 
 public typealias BSONDoc = [String: Any?]
