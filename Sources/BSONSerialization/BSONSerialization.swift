@@ -6,11 +6,12 @@
  * Copyright © 2016 frizlab. All rights reserved.
  */
 
-import Foundation
-import SimpleStream
 #if !os(Linux)
 import CoreGraphics
 #endif
+import Foundation
+import SimpleStream
+
 
 
 public typealias BSONDoc = [String: Any?]
