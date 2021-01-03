@@ -524,6 +524,8 @@ final public class BSONSerialization {
 				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int32>.size: return val.int32Value
 				case .nsIntegerType where MemoryLayout<NSInteger>.size == MemoryLayout<Int64>.size: return val.int64Value
 				case .nsIntegerType:                                                                return val.intValue
+					
+				@unknown default: ()
 				}
 				
 			default: ()
