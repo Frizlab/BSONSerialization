@@ -1,5 +1,5 @@
 # BSONSerialization
-BSON Serialization in native Swift 4
+BSON Serialization in native Swift
 
 ## Installation & Compatibility
 The recommended (and only tested) way to install and use BSONSerialization is
@@ -10,7 +10,7 @@ The content of your `Package.swift` should be something resembling:
 import PackageDescription
 
 let package = Package(
-	name: "toto",
+	name: "MyAwesomePackage",
 	dependencies: [.package(url: "https://github.com/Frizlab/BSONSerialization.git", from: "2.0.0")]
 )
 ```
