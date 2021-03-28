@@ -6,11 +6,12 @@
  * Copyright © 2016 frizlab. All rights reserved.
  */
 
-import XCTest
-@testable import BSONSerialization
-
 import Foundation
-import SimpleStream
+import XCTest
+
+import StreamReader
+
+@testable import BSONSerialization
 
 
 
@@ -838,7 +839,7 @@ class BSONSerializationTests: XCTestCase {
 	func testTwoBSONDocsInOneDataStream() {
 		do {
 			let bsonDocData = Data(hexEncoded: "12 00 00 00 02 61 62 63 00 04 00 00 00 64 65 66 00 00")!
-			let stream = SimpleDataStream(data: bsonDocData + bsonDocData + bsonDocData)
+			let stream = DataReader(data: bsonDocData + bsonDocData + bsonDocData)
 			let doc1 = try BSONSerialization.bsonObject(with: stream)
 			let doc2 = try BSONSerialization.bsonObject(with: stream)
 			let doc3 = try BSONSerialization.bsonObject(with: stream)
