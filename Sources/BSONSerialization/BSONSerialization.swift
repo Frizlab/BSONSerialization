@@ -46,79 +46,6 @@ final public class BSONSerialization {
 		
 	}
 	
-	/** The BSON Serialization errors enum. */
-	public enum BSONSerializationError : Error {
-		/** The given data/stream contains too few bytes to be a valid bson doc. */
-		case dataTooSmall
-		/** The given data size is not the one declared by the bson doc. */
-		case dataLengthDoNotMatch
-		
-		/** The length of the bson doc is invalid. */
-		case invalidLength
-		/**
-		 An invalid element was found.
-		 The element is given in argument to this enum case. */
-		case invalidElementType(UInt8)
-		
-		/** Found an invalid bool value (given in arg). */
-		case invalidBooleanValue(UInt8)
-		
-		/**
-		 Asked to read an invalid string for the required encoding.
-		 The original data that has been tried to be parsed is given in arg of this error. */
-		case invalidString(Data)
-		/**
-		 Invalid end of BSON string found.
-		 Expected `NULL` (`0`), but found the bytes given in argument to this enum case (if `nil`, no data can be read after the string). */
-		case invalidEndOfString(UInt8?)
-		
-		/**
-		 An invalid key was found in an array:
-		 Keys must be integers, sorted in ascending order from `0` to `n-1` (where `n = number of elements in the array`).
-		 
-		 - Note: Not so sure the increments from one element to the next should necessarily be of one…
-		 The doc is pretty vague on the subject.
-		 It says:
-		 ```text
-		 […] with integer values for the keys, starting with 0 and continuing sequentially.
-		 […] The keys must be in ascending numerical order.
-		 ``` */
-		case invalidArrayKey(currentKey: String, previousKey: String?)
-		
-		/** Found an invalid regular expression options value (the complete options and the faulty character are given in arg). */
-		case invalidRegularExpressionOptions(options: String, invalidCharacter: Character)
-		/** Found an invalid regular expression value (the regular expression and the parsing error are given in arg). */
-		case invalidRegularExpression(pattern: String, error: Error)
-		
-		/**
-		 The JS with scope element gives the raw data length in its definition.
-		 If the given length does not match the decoded length, this error is thrown.
-		 The expected and actual length are given in the error. */
-		case invalidJSWithScopeLength(expected: Int, actual: Int)
-		
-		/** An error occurred writing the stream. */
-		case cannotWriteToStream(streamError: Error?)
-		
-		/**
-		 An invalid BSON object was given to be serialized.
-		 The invalid element is passed in argument to this error. */
-		case invalidBSONObject(invalidElement: Any)
-		/**
-		 Tried to serialize an unserializable string (using the C representation).
-		 This is due to the fact that the `\0` char can be used in a valid UTF8 string.
-		 (Note: the characters `\254` and `\255` can NEVER be used in a valid UTF8 string.
-		 Why were they not the separator?)
-		 
-		 Usually, the BSON strings represented using the C representation are dictionary keys.
-		 But they can also be the components of a regexp. */
-		case unserializableCString(String)
-		
-		/** Cannot allocate memory (either with `malloc` or `UnsafePointer.alloc()`). */
-		case cannotAllocateMemory(Int)
-		/** An internal error occurred rendering the serialization impossible. */
-		case internalError
-	}
-	
 	/**
 	 Serialize the given data into a dictionary with String keys, object values.
 	 
@@ -128,9 +55,9 @@ final public class BSONSerialization {
 	 - Returns: The serialized BSON data. */
 	public class func bsonObject(with data: Data, options opt: ReadingOptions = []) throws -> BSONDoc {
 		/* Let’s check whether the length of the data correspond to the length declared in the data. */
-		guard data.count >= 5 else {throw BSONSerializationError.dataTooSmall}
+		guard data.count >= 5 else {throw Err.dataTooSmall}
 		let length32 = data.withUnsafeBytes{ $0.load(as: Int32.self) }
-		guard Int(length32) == data.count else {throw BSONSerializationError.dataLengthDoNotMatch}
+		guard Int(length32) == data.count else {throw Err.dataLengthDoNotMatch}
 		
 		let bufferedData = DataReader(data: data)
 		return try bsonObject(with: bufferedData, options: opt)
@@ -167,7 +94,7 @@ final public class BSONSerialization {
 		
 		streamReader.readSizeLimit = initialReadPosition + MemoryLayout<Int32>.size
 		let length32: Int32 = try streamReader.readType()
-		guard length32 >= 5 else {throw BSONSerializationError.dataTooSmall}
+		guard length32 >= 5 else {throw Err.dataTooSmall}
 		
 		let length = Int(length32)
 		streamReader.readSizeLimit = initialReadPosition + length
@@ -176,7 +103,7 @@ final public class BSONSerialization {
 		
 		var isAtEnd = false
 		while !isAtEnd {
-			guard streamReader.currentReadPosition - initialReadPosition <= length else {throw BSONSerializationError.invalidLength}
+			guard streamReader.currentReadPosition - initialReadPosition <= length else {throw Err.invalidLength}
 			
 			let currentElementType: UInt8 = try streamReader.readType()
 			guard currentElementType != BSONElementType.endOfDocument.rawValue else {
@@ -195,7 +122,7 @@ final public class BSONSerialization {
 					switch valAsInt8 {
 						case 1: try decodeCallback(key, true);  ret[key] = true
 						case 0: try decodeCallback(key, false); ret[key] = false
-						default: throw BSONSerializationError.invalidBooleanValue(valAsInt8)
+						default: throw Err.invalidBooleanValue(valAsInt8)
 					}
 					
 				case .int32Bits? where MemoryLayout<Int>.size == MemoryLayout<Int32>.size:
@@ -247,12 +174,12 @@ final public class BSONSerialization {
 							case "l": (/* Make \w, \W, etc. locale dependent. (Unsupported, or most likely default unremovable behaviour…) */)
 							case "s": foundationOptions.insert(.dotMatchesLineSeparators) /* Dotall mode (`.` matches everything). Not sure if this option is enough. */
 							case "u": foundationOptions.insert(.useUnicodeWordBoundaries) /* Make \w, \W, etc. match unicode. */
-							default: throw BSONSerializationError.invalidRegularExpressionOptions(options: options, invalidCharacter: c)
+							default: throw Err.invalidRegularExpressionOptions(options: options, invalidCharacter: c)
 						}
 					}
 					let val: NSRegularExpression
 					do    {val = try NSRegularExpression(pattern: pattern, options: foundationOptions)}
-					catch {throw BSONSerializationError.invalidRegularExpression(pattern: pattern, error: error)}
+					catch {throw Err.invalidRegularExpression(pattern: pattern, error: error)}
 					
 					try decodeCallback(key, val)
 					ret[key] = val
@@ -271,7 +198,7 @@ final public class BSONSerialization {
 					var val = [Any?]()
 					var prevKey: String? = nil
 					_ = try bsonObject(with: streamReader, options: opt, initialReadPosition: streamReader.currentReadPosition, decodeCallback: { subkey, subval in
-						guard String(val.count) == subkey else {throw BSONSerializationError.invalidArrayKey(currentKey: subkey, previousKey: prevKey)}
+						guard String(val.count) == subkey else {throw Err.invalidArrayKey(currentKey: subkey, previousKey: prevKey)}
 						val.append(subval)
 						prevKey = subkey
 					})
@@ -310,7 +237,7 @@ final public class BSONSerialization {
 					let valSize: Int32 = try streamReader.readType()
 					let jsCode = try streamReader.readBSONString(encoding: .utf8)
 					let scope = try bsonObject(with: streamReader, options: opt, initialReadPosition: streamReader.currentReadPosition)
-					guard streamReader.currentReadPosition - valStartPosition == Int(valSize) else {throw BSONSerializationError.invalidJSWithScopeLength(expected: Int(valSize), actual: streamReader.currentReadPosition - valStartPosition)}
+					guard streamReader.currentReadPosition - valStartPosition == Int(valSize) else {throw Err.invalidJSWithScopeLength(expected: Int(valSize), actual: streamReader.currentReadPosition - valStartPosition)}
 					let val = JavascriptWithScope(javascript: jsCode, scope: scope)
 					try decodeCallback(key, val)
 					ret[key] = val
@@ -341,11 +268,11 @@ final public class BSONSerialization {
 					try decodeCallback(key, val)
 					ret[key] = val
 					
-				case nil: throw BSONSerializationError.invalidElementType(currentElementType)
+				case nil: throw Err.invalidElementType(currentElementType)
 				case .endOfDocument?: fatalError() /* Guarded before the switch */
 			}
 		}
-		guard streamReader.currentReadPosition - initialReadPosition == length else {throw BSONSerializationError.invalidLength}
+		guard streamReader.currentReadPosition - initialReadPosition == length else {throw Err.invalidLength}
 		return ret
 	}
 	
@@ -362,7 +289,7 @@ final public class BSONSerialization {
 		})
 		
 		guard let nsdata = stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as? NSData else {
-			throw BSONSerializationError.internalError
+			throw Err.internalError
 		}
 		
 		var data = Data(referencing: nsdata)
@@ -706,7 +633,7 @@ final public class BSONSerialization {
 				size += 12
 				
 			case let unknown?:
-				throw BSONSerializationError.invalidBSONObject(invalidElement: unknown)
+				throw Err.invalidBSONObject(invalidElement: unknown)
 		}
 		
 		return (size, subSizes)
@@ -829,20 +756,7 @@ final public class BSONSerialization {
 				
 				var type = bin.binaryTypeAsInt
 				size += try write(value: &type, toStream: stream)
-				
-				/* Writing a 0-length data seems to make next writes to the stream fail. */
-				if bin.data.count > 0 {
-					/* Note: Joe says we can bind the memory (or even assume it’s already bound) to UInt8
-					 *       because the memory will be immutable in the closure, and thus cannot be aliased.
-					 * https://twitter.com/jckarter/status/1142446184700624896 */
-					let written = bin.data.withUnsafeBytes{ (bytes: UnsafeRawBufferPointer) -> Int in
-						let boundBytes = bytes.bindMemory(to: UInt8.self)
-						assert(bin.data.count == boundBytes.count, "INTERNAL ERROR")
-						return stream.write(boundBytes.baseAddress!, maxLength: boundBytes.count)
-					}
-					guard written == bin.data.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-					size += written
-				}
+				size += try bin.data.withUnsafeBytes{ try stream.write(dataPtr: $0) }
 				
 			case var val as MongoObjectId:
 				size += try write(elementType: .objectId, toStream: stream)
@@ -886,7 +800,7 @@ final public class BSONSerialization {
 				size += try write(value: &bytes, toStream: stream)
 				
 			case let unknown?:
-				throw BSONSerializationError.invalidBSONObject(invalidElement: unknown)
+				throw Err.invalidBSONObject(invalidElement: unknown)
 		}
 		
 		return size
@@ -955,21 +869,10 @@ final public class BSONSerialization {
 	private class func write(CEncodedString str: String, toStream stream: OutputStream) throws -> Int {
 		var written = 0
 		
-		/* Apparently writing 0 bytes to the stream will f**ck it up… */
-		if str.count > 0 {
-			/* Let’s get the UTF8 bytes of the string. */
-			let bytes = [UInt8](str.utf8)
-			assert(bytes.count > 0, "How on earth a non-empty string has 0 UTF-8 bytes?")
-			guard !bytes.contains(0) else {throw BSONSerializationError.unserializableCString(str)}
-			
-			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in
-				assert(p.count == bytes.count)
-				return stream.write(p.baseAddress!, maxLength: p.count)
-			}
-			
-			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-			written += curWrite
-		}
+		/* Let’s get the UTF8 bytes of the string. */
+		let bytes = [UInt8](str.utf8)
+		guard !bytes.contains(0) else {throw Err.unserializableCString(str)}
+		written += try bytes.withUnsafeBufferPointer{ try stream.write(dataPtr: UnsafeRawBufferPointer($0)) }
 		
 		var zero: Int8 = 0
 		written += try write(value: &zero, toStream: stream)
@@ -984,19 +887,9 @@ final public class BSONSerialization {
 		/* Let’s write the size of the string to the stream. */
 		written += try write(value: &strLength, toStream: stream)
 		
-		/* Apparently writing 0 bytes to the stream will f**ck it up… */
-		if str.count > 0 {
-			/* Let’s get the UTF8 bytes of the string. */
-			let bytes = [UInt8](str.utf8)
-			assert(bytes.count > 0, "How on earth a non-empty string has 0 UTF-8 bytes?")
-			let curWrite = bytes.withUnsafeBufferPointer{ p -> Int in
-				assert(p.count == bytes.count)
-				return stream.write(p.baseAddress!, maxLength: p.count)
-			}
-			
-			guard curWrite == bytes.count else {throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)}
-			written += curWrite
-		}
+		/* Let’s get the UTF8 bytes of the string. */
+		let bytes = [UInt8](str.utf8)
+		written += try bytes.withUnsafeBufferPointer{ try stream.write(dataPtr: UnsafeRawBufferPointer($0)) }
 		
 		var zero: Int8 = 0
 		written += try write(value: &zero, toStream: stream)
@@ -1012,11 +905,7 @@ final public class BSONSerialization {
 			/* We cannot use withMemoryRebound because the doc says this method can only be used if the new type have the same size and stride as the original pointer’s type.
 			 * So instead we have to convert the pointer to a raw pointer and bind the raw pointer’s memory to UInt8. */
 			let rawPointer = UnsafeRawPointer(pointer)
-			let uint8Pointer = rawPointer.bindMemory(to: UInt8.self, capacity: size)
-			guard stream.write(uint8Pointer, maxLength: size) == size else {
-				throw BSONSerializationError.cannotWriteToStream(streamError: stream.streamError)
-			}
-			return size
+			return try stream.write(dataPtr: UnsafeRawBufferPointer(start: rawPointer, count: size))
 		})
 	}
 	
@@ -1054,7 +943,7 @@ private extension StreamReader {
 		
 		/* This String init fails if the data is invalid for the given encoding. */
 		guard let str = String(data: data, encoding: encoding) else {
-			throw BSONSerialization.BSONSerializationError.invalidString(data)
+			throw Err.invalidString(data)
 		}
 		
 		return str
@@ -1072,13 +961,13 @@ private extension StreamReader {
 		let strData = try readData(size: Int(stringSize-1))
 		assert(strData.count == Int(stringSize-1))
 		guard let str = String(data: strData, encoding: encoding) else {
-			throw BSONSerialization.BSONSerializationError.invalidString(strData)
+			throw Err.invalidString(strData)
 		}
 		
 		/* Reading the last byte and checking it is indeed 0. */
 		try readData(size: 1, { null in
 			assert(null.count == 1)
-			guard null.first == 0 else {throw BSONSerialization.BSONSerializationError.invalidEndOfString(null.first)}
+			guard null.first == 0 else {throw Err.invalidEndOfString(null.first)}
 		})
 		
 		return str

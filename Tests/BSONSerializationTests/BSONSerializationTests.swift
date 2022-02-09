@@ -85,7 +85,7 @@ class BSONSerializationTests: XCTestCase {
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
-				case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "1" && prevKey == nil: (/*Success*/)
+				case Err.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "1" && prevKey == nil: (/*Success*/)
 				default: XCTFail("Invalid error thrown \(error)")
 			}
 		}
@@ -98,7 +98,7 @@ class BSONSerializationTests: XCTestCase {
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
-				case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "2" && prevKey == "0": (/*Success*/)
+				case Err.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "2" && prevKey == "0": (/*Success*/)
 				default: XCTFail("Invalid error thrown \(error)")
 			}
 		}

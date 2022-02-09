@@ -267,7 +267,7 @@ private func areBSONEntitiesEqual(_ entity1: Any?, _ entity2: Any?) throws -> Bo
 		case let dbPointer as MongoDBPointer: guard entity2 as? MongoDBPointer == dbPointer else {return false}
 			
 		default:
-			throw BSONSerialization.BSONSerializationError.invalidBSONObject(invalidElement: entity1! /* nil case already processed above */)
+			throw Err.invalidBSONObject(invalidElement: entity1! /* nil case already processed above */)
 	}
 	
 	return true
