@@ -927,6 +927,7 @@ class BSONSerializationTests: XCTestCase {
 		
 		try writeBlock(stream)
 		
+		/* Note: Are we really allowed to access dataWrittenToMemoryStreamKey while the stream is not closed? */
 		return Data(referencing: stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as! NSData)
 	}
 	

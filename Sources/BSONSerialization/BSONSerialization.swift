@@ -288,6 +288,7 @@ final public class BSONSerialization {
 			sizes[offset] = size
 		})
 		
+		/* Note: Are we really allowed to access dataWrittenToMemoryStreamKey while the stream is not closed? */
 		guard let nsdata = stream.property(forKey: Stream.PropertyKey.dataWrittenToMemoryStreamKey) as? NSData else {
 			throw Err.internalError
 		}
