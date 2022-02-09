@@ -1,10 +1,10 @@
 /*
- * BSONClasses.swift
- * BSONSerialization
- *
- * Created by François Lamboley on 23/12/2016.
- * Copyright © 2016 frizlab. All rights reserved.
- */
+ * BSONClasses.swift
+ * BSONSerialization
+ *
+ * Created by François Lamboley on 23/12/2016.
+ * Copyright © 2016 frizlab. All rights reserved.
+ */
 
 import Foundation
 
@@ -199,8 +199,9 @@ public struct MongoDBPointer : Equatable {
 }
 
 
-/** Check both given BSONDoc for equality. Throws if the docs are not valid BSON
-docs! */
+/**
+ Check both given BSONDoc for equality.
+ Throws if the docs are not valid BSON docs! */
 public func areBSONDocEqual(_ doc1: BSONDoc, _ doc2: BSONDoc) throws -> Bool {
 	guard doc1.count == doc2.count else {return false}
 	for (key, val1) in doc1 {
@@ -214,59 +215,59 @@ private func areBSONEntitiesEqual(_ entity1: Any?, _ entity2: Any?) throws -> Bo
 	let entity1 = BSONSerialization.normalized(BSONEntity: entity1)
 	let entity2 = BSONSerialization.normalized(BSONEntity: entity2)
 	switch entity1 {
-	case nil:             guard entity2          == nil else {return false}
-	case let val as Bool: guard entity2 as? Bool == val else {return false}
-		
-	case let val1 as Int32:
-		guard entity2 as? Int32 == val1 else {
-			if MemoryLayout<Int>.size == MemoryLayout<Int32>.size, let val2 = entity2 as? Int, val1 == Int32(val2) {return true}
-			return false
-		}
-		
-	case let val1 as Int64:
-		guard entity2 as? Int64 == val1 else {
-			if MemoryLayout<Int>.size == MemoryLayout<Int64>.size, let val2 = entity2 as? Int, val1 == Int64(val2) {return true}
-			return false
-		}
-		
-	case let val1 as Int:
-		guard entity2 as? Int == val1 else {
-			if MemoryLayout<Int>.size == MemoryLayout<Int32>.size, let val2 = entity2 as? Int32, val1 == Int(val2) {return true}
-			if MemoryLayout<Int>.size == MemoryLayout<Int64>.size, let val2 = entity2 as? Int64, val1 == Int(val2) {return true}
-			return false
-		}
-		
-	case let val as Double:    guard entity2 as? Double    == val else {return false}
-	case let val as Double128: guard entity2 as? Double128 == val else {return false}
-	case let val as Date:      guard entity2 as? Date      == val else {return false}
-	case let str as String:    guard entity2 as? String    == str else {return false}
-	case let regexp1 as NSRegularExpression:
-		guard let regexp2 = entity2 as? NSRegularExpression else {return false}
-		guard regexp1.pattern == regexp2.pattern && regexp1.options == regexp2.options else {return false}
-		
-	case let subObj1 as BSONDoc:
-		guard let subObj2 = entity2 as? BSONDoc else {return false}
-		guard try areBSONDocEqual(subObj1, subObj2) else {return false}
-		
-	case let array1 as [Any?]:
-		guard let array2 = entity2 as? [Any?], array1.count == array2.count else {return false}
-		for (subval1, subval2) in zip(array1, array2) {
-			guard try areBSONEntitiesEqual(subval1, subval2) else {return false}
-		}
-		
-	case let val as MongoTimestamp:      guard entity2 as? MongoTimestamp      == val else {return false}
-	case let bin as MongoBinary:         guard entity2 as? MongoBinary         == bin else {return false}
-	case let val as MongoObjectId:       guard entity2 as? MongoObjectId       == val else {return false}
-	case let js  as Javascript:          guard entity2 as? Javascript          == js  else {return false}
-	case let sjs as JavascriptWithScope: guard entity2 as? JavascriptWithScope == sjs else {return false}
-		
-	case _ as MinKey: guard entity2 is MinKey else {return false}
-	case _ as MaxKey: guard entity2 is MaxKey else {return false}
-		
-	case let dbPointer as MongoDBPointer: guard entity2 as? MongoDBPointer == dbPointer else {return false}
-		
-	default:
-		throw BSONSerialization.BSONSerializationError.invalidBSONObject(invalidElement: entity1! /* nil case already processed above */)
+		case nil:             guard entity2          == nil else {return false}
+		case let val as Bool: guard entity2 as? Bool == val else {return false}
+			
+		case let val1 as Int32:
+			guard entity2 as? Int32 == val1 else {
+				if MemoryLayout<Int>.size == MemoryLayout<Int32>.size, let val2 = entity2 as? Int, val1 == Int32(val2) {return true}
+				return false
+			}
+			
+		case let val1 as Int64:
+			guard entity2 as? Int64 == val1 else {
+				if MemoryLayout<Int>.size == MemoryLayout<Int64>.size, let val2 = entity2 as? Int, val1 == Int64(val2) {return true}
+				return false
+			}
+			
+		case let val1 as Int:
+			guard entity2 as? Int == val1 else {
+				if MemoryLayout<Int>.size == MemoryLayout<Int32>.size, let val2 = entity2 as? Int32, val1 == Int(val2) {return true}
+				if MemoryLayout<Int>.size == MemoryLayout<Int64>.size, let val2 = entity2 as? Int64, val1 == Int(val2) {return true}
+				return false
+			}
+			
+		case let val as Double:    guard entity2 as? Double    == val else {return false}
+		case let val as Double128: guard entity2 as? Double128 == val else {return false}
+		case let val as Date:      guard entity2 as? Date      == val else {return false}
+		case let str as String:    guard entity2 as? String    == str else {return false}
+		case let regexp1 as NSRegularExpression:
+			guard let regexp2 = entity2 as? NSRegularExpression else {return false}
+			guard regexp1.pattern == regexp2.pattern && regexp1.options == regexp2.options else {return false}
+			
+		case let subObj1 as BSONDoc:
+			guard let subObj2 = entity2 as? BSONDoc else {return false}
+			guard try areBSONDocEqual(subObj1, subObj2) else {return false}
+			
+		case let array1 as [Any?]:
+			guard let array2 = entity2 as? [Any?], array1.count == array2.count else {return false}
+			for (subval1, subval2) in zip(array1, array2) {
+				guard try areBSONEntitiesEqual(subval1, subval2) else {return false}
+			}
+			
+		case let val as MongoTimestamp:      guard entity2 as? MongoTimestamp      == val else {return false}
+		case let bin as MongoBinary:         guard entity2 as? MongoBinary         == bin else {return false}
+		case let val as MongoObjectId:       guard entity2 as? MongoObjectId       == val else {return false}
+		case let js  as Javascript:          guard entity2 as? Javascript          == js  else {return false}
+		case let sjs as JavascriptWithScope: guard entity2 as? JavascriptWithScope == sjs else {return false}
+			
+		case _ as MinKey: guard entity2 is MinKey else {return false}
+		case _ as MaxKey: guard entity2 is MaxKey else {return false}
+			
+		case let dbPointer as MongoDBPointer: guard entity2 as? MongoDBPointer == dbPointer else {return false}
+			
+		default:
+			throw BSONSerialization.BSONSerializationError.invalidBSONObject(invalidElement: entity1! /* nil case already processed above */)
 	}
 	
 	return true

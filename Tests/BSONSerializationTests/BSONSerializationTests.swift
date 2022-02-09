@@ -1,10 +1,10 @@
 /*
- * BSONSerializationTests.swift
- * BSONSerializationTests
- *
- * Created by François Lamboley on 1/17/16.
- * Copyright © 2016 frizlab. All rights reserved.
- */
+ * BSONSerializationTests.swift
+ * BSONSerializationTests
+ *
+ * Created by François Lamboley on 1/17/16.
+ * Copyright © 2016 frizlab. All rights reserved.
+ */
 
 import Foundation
 import XCTest
@@ -85,8 +85,8 @@ class BSONSerializationTests: XCTestCase {
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
-			case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "1" && prevKey == nil: (/*Success*/)
-			default: XCTFail("Invalid error thrown \(error)")
+				case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "1" && prevKey == nil: (/*Success*/)
+				default: XCTFail("Invalid error thrown \(error)")
 			}
 		}
 	}
@@ -98,8 +98,8 @@ class BSONSerializationTests: XCTestCase {
 			XCTFail("Decoding should have failed.")
 		} catch {
 			switch error {
-			case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "2" && prevKey == "0": (/*Success*/)
-			default: XCTFail("Invalid error thrown \(error)")
+				case BSONSerialization.BSONSerializationError.invalidArrayKey(currentKey: let key, previousKey: let prevKey) where key == "2" && prevKey == "0": (/*Success*/)
+				default: XCTFail("Invalid error thrown \(error)")
 			}
 		}
 	}
