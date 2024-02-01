@@ -59,6 +59,9 @@ public struct MongoBinary : Equatable {
 		case function      = 0x01
 		case uuid          = 0x04
 		case md5           = 0x05
+		/* The data is an encrypted or marked as intended to be encrypted BSON value.
+		 * See <https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/subtype6.rst> for the format specs.
+		 * I do not provide a way to decrypt/encrypt values in this library. */
 		case encryptedBSON = 0x06
 		
 		/* Start of user-defined subtypes (up to 0xFF). */
