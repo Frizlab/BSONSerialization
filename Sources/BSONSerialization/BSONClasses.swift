@@ -55,20 +55,21 @@ public struct MongoTimestamp : Equatable {
 public struct MongoBinary : Equatable {
 	
 	public enum BinarySubtype : UInt8 {
-		case genericBinary = 0x00
-		case function      = 0x01
-		case uuid          = 0x04
-		case md5           = 0x05
+		case genericBinary  = 0x00
+		case function       = 0x01
+		case uuid           = 0x04
+		case md5            = 0x05
 		/* The data is an encrypted or marked as intended to be encrypted BSON value.
 		 * See <https://github.com/mongodb/specifications/blob/master/source/client-side-encryption/subtype6.rst> for the format specs.
 		 * I do not provide a way to decrypt/encrypt values in this library. */
-		case encryptedBSON = 0x06
+		case encryptedBSON  = 0x06
+		case compressedBSON = 0x07
 		
 		/* Start of user-defined subtypes (up to 0xFF). */
-		case userDefined   = 0x80
+		case userDefined    = 0x80
 		
-		case uuidOld       = 0x03
-		case binaryOld     = 0x02
+		case uuidOld        = 0x03
+		case binaryOld      = 0x02
 	}
 	
 	public let binaryTypeAsInt: UInt8
