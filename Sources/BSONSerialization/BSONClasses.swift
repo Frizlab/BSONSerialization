@@ -59,7 +59,7 @@ public struct MongoBinary : Equatable {
 		case function      = 0x01
 		case uuid          = 0x04
 		case md5           = 0x05
-//		case ciphertext    = 0x06 /* Not merged yet in specs */
+		case encryptedBSON = 0x06
 		
 		/* Start of user-defined subtypes (up to 0xFF). */
 		case userDefined   = 0x80
